@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | Create Account{% endblock %}
+
+{% block content %}
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 65vh;
+    }
+
+    .auth-card {
+        max-width: 480px;
+        width: 100%;
+    }
+
+    .auth-title {
+        font-size: 2rem;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .auth-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+
+    input, select {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        padding: 14px 18px;
+        border-radius: 12px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s ease, background-color 0.3s ease;
+    }
+
+    input:focus, select:focus {
+        border-color: #6366f1;
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    select {
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 18px center;
+    }
+
+    select option {
+        background-color: #161e31;
+        color: var(--text-main);
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .auth-footer a {
+        color: #818cf8;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="auth-container">
+    <div class="glass-card auth-card">
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-subtitle">Join EventLens for instant wedding photo delivery</p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Register As</label>
+                <select id="role" name="role" required>
+                    <option value="guest" {% if request.GET.role == 'guest' %}selected{% endif %}>Wedding Guest</option>
+                    <option value="photographer" {% if request.GET.role == 'photographer' %}selected{% endif %}>Photographer</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
+        </form>
+
+        <div class="auth-footer">
+            Already have an account? <a href="{% url 'login' %}">Sign in here</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

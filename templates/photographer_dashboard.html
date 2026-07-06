@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | Photographer Dashboard{% endblock %}
+
+{% block extra_head %}
+<!-- Dropzone.js for Bulk Uploads -->
+<link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css" type="text/css" />
+<script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 30px;
+    }
+
+    @media (max-width: 900px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-title {
+        font-size: 1.4rem;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 10px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+
+    input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        padding: 14px 18px;
+        border-radius: 12px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s;
+    }
+
+    input:focus {
+        border-color: #6366f1;
+    }
+
+    .events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .event-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        transition: border-color 0.3s;
+    }
+
+    .event-card:hover {
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .event-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+
+    .event-name {
+        font-size: 1.3rem;
+        font-weight: 700;
+    }
+
+    .event-meta {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        margin-top: 4px;
+    }
+
+    .event-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 10px;
+    }
+
+    .dropzone-container {
+        display: none;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Custom Dropzone Styling */
+    .dropzone {
+        background: rgba(255, 255, 255, 0.01) !important;
+        border: 2px dashed rgba(99, 102, 241, 0.3) !important;
+        border-radius: 12px !important;
+        color: var(--text-main) !important;
+        padding: 30px !important;
+        transition: border-color 0.3s;
+    }
+
+    .dropzone:hover {
+        border-color: #6366f1 !important;
+    }
+
+    .dropzone .dz-preview .dz-details {
+        background-color: #1e293b !important;
+    }
+</style>
+
+<div class="dashboard-grid">
+    <!-- Left Column: Create Event -->
+    <div class="glass-card" style="height: fit-content;">
+        <h2 class="form-title">Create Wedding Event</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="name">Wedding Name</label>
+                <input type="text" id="name" name="name" placeholder="e.g. John & Jane Wedding" required>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Wedding Date</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="passcode">Gallery Passcode (Optional)</label>
+                <input type="text" id="passcode" name="passcode" placeholder="e.g. 1234">
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%;">Create Event</button>
+        </form>
+    </div>
+
+    <!-- Right Column: Events List & Upload Manager -->
+    <div class="glass-card">
+        <h2 class="form-title" style="margin-bottom: 24px;">Your Wedding Galleries</h2>
+        
+        {% if not events %}
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <p style="font-size: 1.1rem; margin-bottom: 10px;">No events created yet.</p>
+                <p style="font-size: 0.9rem;">Fill out the form on the left to start uploading galleries.</p>
+            </div>
+        {% else %}
+            <div class="events-list">
+                {% for event in events %}
+                    <div class="event-card">
+                        <div class="event-header">
+                            <div>
+                                <h3 class="event-name">{{ event.name }}</h3>
+                                <div class="event-meta">
+                                    Date: {{ event.date }} &nbsp;|&nbsp; 
+                                    Photos: <strong id="photo-count-{{ event.id }}">{{ event.photos.count }}</strong> &nbsp;|&nbsp; 
+                                    Passcode: <strong>{% if event.passcode %}{{ event.passcode }}{% else %}None{% endif %}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="event-actions">
+                            <button onclick="toggleUploadZone({{ event.id }})" class="btn-sm" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main) !important; box-shadow: none;">
+                                Bulk Upload Photos
+                            </button>
+                            <a href="{% url 'guest_portal' event.slug %}" target="_blank" class="btn-sm" style="text-align: center; display: inline-block;">
+                                View Portal ↗
+                            </a>
+                        </div>
+
+                        <!-- Dropzone Upload Area -->
+                        <div id="upload-zone-{{ event.id }}" class="dropzone-container">
+                            <form action="{% url 'upload_photos' event.id %}" class="dropzone" id="my-dropzone-{{ event.id }}">
+                                {% csrf_token %}
+                                <div class="dz-message" data-dz-message>
+                                    <span>Drag & Drop Wedding Photos Here (JPG/PNG)</span>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Initialize Dropzone configuration
+    Dropzone.autoDiscover = false;
+
+    const activeDropzones = {};
+
+    function toggleUploadZone(eventId) {
+        const zone = document.getElementById(`upload-zone-${eventId}`);
+        if (zone.style.display === 'block') {
+            zone.style.display = 'none';
+        } else {
+            zone.style.display = 'block';
+            
+            // Lazy initialize Dropzone for this event if not already done
+            if (!activeDropzones[eventId]) {
+                const dzId = `#my-dropzone-${eventId}`;
+                activeDropzones[eventId] = new Dropzone(dzId, {
+                    paramName: "file",
+                    maxFilesize: 25, // MB
+                    acceptedFiles: "image/*",
+                    uploadMultiple: true,
+                    parallelUploads: 5,
+                    dictDefaultMessage: "Drag and drop images here to upload",
+                    init: function() {
+                        this.on("successmultiple", function(files, response) {
+                            console.log("Success bulk upload:", response);
+                            // Refresh photo count dynamically
+                            const countEl = document.getElementById(`photo-count-${eventId}`);
+                            if (countEl) {
+                                const currentCount = parseInt(countEl.innerText);
+                                countEl.innerText = currentCount + files.length;
+                            }
+                        });
+                        this.on("errormultiple", function(files, response) {
+                            console.error("Upload error:", response);
+                        });
+                    }
+                });
+            }
+        }
+    }
+</script>
+{% endblock %}

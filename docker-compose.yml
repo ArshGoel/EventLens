@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: eventlens_redis
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    image: eventlens_app:latest
+    container_name: eventlens_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - sqlite_db:/database
+      - ./.insightface:/root/.insightface
+    ports:
+      - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SQLITE_DB_PATH=/database/db.sqlite3
+    depends_on:
+      - redis
+
+  celery:
+    build: .
+    image: eventlens_app:latest
+    container_name: eventlens_celery
+    command: celery -A EventLens worker --loglevel=info
+    volumes:
+      - .:/app
+      - sqlite_db:/database
+      - ./.insightface:/root/.insightface
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SQLITE_DB_PATH=/database/db.sqlite3
+    depends_on:
+      - redis
+      - web
+
+volumes:
+  sqlite_db:

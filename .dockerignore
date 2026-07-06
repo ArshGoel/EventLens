@@ -1,0 +1,7 @@
+.git
+.insightface
+__pycache__
+*.pyc
+media/
+db.sqlite3
+*.sqlite3

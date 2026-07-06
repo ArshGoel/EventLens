@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventLens | Real-Time Notifications</title>
+    <!-- Import Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary-glow: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+        }
+
+        h1, h2, h3 {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            margin-top: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--primary-glow);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 24px;
+        }
+
+        .status-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 100px;
+            border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            transition: background-color 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background-color: var(--error);
+            box-shadow: 0 0 10px var(--error);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 14px 18px;
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+
+        input:focus {
+            border-color: #818cf8;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .btn {
+            width: 100%;
+            background: var(--primary-glow);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Notifications Container */
+        #notification-box {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 360px;
+            max-width: calc(100vw - 60px);
+        }
+
+        .toast {
+            background: rgba(15, 23, 42, 0.9);
+            border-left: 4px solid #a855f7;
+            border-radius: 12px;
+            padding: 20px;
+            color: var(--text-main);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            transform: translateX(120%);
+            animation: slideIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        @keyframes slideIn {
+            to { transform: translateX(0); }
+        }
+
+        .toast.hide {
+            animation: slideOut 0.35s ease forwards;
+        }
+
+        @keyframes slideOut {
+            to { transform: translateX(120%); opacity: 0; }
+        }
+
+        .toast-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .toast-message {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="logo">EventLens</h1>
+        <p class="subtitle">Real-Time WebSockets Notification System</p>
+        
+        <div class="card">
+            <div class="status-container">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">Connecting WebSocket...</span>
+            </div>
+
+            <div class="form-group">
+                <label for="title">Notification Title</label>
+                <input type="text" id="title" value="Image Processed">
+            </div>
+
+            <div class="form-group">
+                <label for="message">Notification Message</label>
+                <input type="text" id="message" value="Your event photography album is ready for sharing.">
+            </div>
+
+            <button id="trigger-btn" class="btn" disabled>Trigger Background Task</button>
+        </div>
+    </div>
+
+    <!-- Live Toast Container -->
+    <div id="notification-box"></div>
+
+    <script>
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const triggerBtn = document.getElementById('trigger-btn');
+        const notificationBox = document.getElementById('notification-box');
+
+        // Setup WebSocket connection
+        const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws_path = ws_scheme + '://' + window.location.host + '/ws/notifications/';
+        
+        console.log("Connecting to WebSocket at:", ws_path);
+        const socket = new WebSocket(ws_path);
+
+        socket.onopen = function(e) {
+            console.log("WebSocket connection established!");
+            statusDot.className = 'status-dot connected';
+            statusText.innerText = 'WebSocket Connected';
+            triggerBtn.disabled = false;
+        };
+
+        socket.onclose = function(e) {
+            console.log("WebSocket connection closed.");
+            statusDot.className = 'status-dot disconnected';
+            statusText.innerText = 'WebSocket Disconnected';
+            triggerBtn.disabled = true;
+        };
+
+        socket.onerror = function(e) {
+            console.error("WebSocket error:", e);
+        };
+
+        socket.onmessage = function(e) {
+            console.log("Received websocket message:", e.data);
+            const data = JSON.parse(e.data);
+            showNotification(data.title, data.message);
+        };
+
+        // Show Toast Notification
+        function showNotification(title, message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            
+            notificationBox.appendChild(toast);
+
+            // Automatically slide out and remove after 6 seconds
+            setTimeout(() => {
+                toast.classList.add('hide');
+                setTimeout(() => {
+                    toast.remove();
+                }, 350);
+            }, 6000);
+        }
+
+        // Trigger task view call
+        triggerBtn.addEventListener('click', function() {
+            const titleVal = document.getElementById('title').value;
+            const messageVal = document.getElementById('message').value;
+
+            triggerBtn.disabled = true;
+            triggerBtn.innerText = 'Queueing Celery Task...';
+
+            fetch(`/trigger-task/?title=${encodeURIComponent(titleVal)}&message=${encodeURIComponent(messageVal)}`)
+                .then(res => res.json())
+                .then(data => {
+                    console.log("Task queued:", data);
+                    triggerBtn.innerText = 'Task Queued! Waiting 3s...';
+                    
+                    // Reset button after the Celery task completes and notifies
+                    setTimeout(() => {
+                        triggerBtn.disabled = false;
+                        triggerBtn.innerText = 'Trigger Background Task';
+                    }, 3500);
+                })
+                .catch(err => {
+                    console.error("Error queueing task:", err);
+                    triggerBtn.disabled = false;
+                    triggerBtn.innerText = 'Trigger Background Task';
+                });
+        });
+    </script>
+</body>
+</html>

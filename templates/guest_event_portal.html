@@ -1,0 +1,418 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | {{ event.name }} Gallery{% endblock %}
+
+{% block content %}
+<style>
+    .portal-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .event-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+
+    .event-date {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .grid-portal {
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+        gap: 30px;
+    }
+
+    @media (max-width: 900px) {
+        .grid-portal {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .selfie-card {
+        text-align: center;
+        height: fit-content;
+        position: sticky;
+        top: 100px;
+    }
+
+    .selfie-preview-container {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 2px dashed rgba(99, 102, 241, 0.4);
+        margin: 0 auto 20px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        background-color: rgba(255, 255, 255, 0.01);
+    }
+
+    .selfie-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .selfie-placeholder {
+        font-size: 3rem;
+    }
+
+    .file-input-label {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        padding: 12px 24px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: inline-block;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: background 0.3s, border-color 0.3s;
+        margin-top: 10px;
+    }
+
+    .file-input-label:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: #6366f1;
+    }
+
+    /* Live Progress Box */
+    .progress-box {
+        display: none;
+        background: rgba(99, 102, 241, 0.05);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 20px;
+        text-align: left;
+    }
+
+    .progress-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1rem;
+        margin-bottom: 8px;
+    }
+
+    .progress-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--success);
+        box-shadow: 0 0 8px var(--success);
+        animation: pulse 1.5s infinite;
+    }
+
+    .progress-desc {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
+
+    /* Photo Gallery */
+    .gallery-container {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .gallery-title {
+        font-size: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 12px;
+    }
+
+    .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .photo-card {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        aspect-ratio: 4/5;
+        cursor: pointer;
+        position: relative;
+        background-color: rgba(255, 255, 255, 0.01);
+    }
+
+    .photo-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+
+    .photo-card:hover img {
+        transform: scale(1.05);
+    }
+
+    .photo-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(15, 23, 42, 0.8) 0%, transparent 40%);
+        opacity: 0;
+        transition: opacity 0.3s;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: 16px;
+    }
+
+    .photo-card:hover .photo-overlay {
+        opacity: 1;
+    }
+
+    .btn-download-sm {
+        background: white;
+        color: #0f172a;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    /* Lightbox Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(11, 15, 25, 0.95);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+    }
+
+    .modal-content {
+        max-width: 90%;
+        max-height: 80vh;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+
+    .modal-content img {
+        width: 100%;
+        height: auto;
+        max-height: 80vh;
+        object-fit: contain;
+        display: block;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        font-size: 2rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        background: none;
+        border: none;
+        transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+        color: var(--text-main);
+    }
+
+    .modal-actions {
+        position: absolute;
+        bottom: 24px;
+        display: flex;
+        gap: 16px;
+    }
+</style>
+
+<div class="portal-header">
+    <h1 class="event-title">{{ event.name }}</h1>
+    <p class="event-date">Wedding Date: {{ event.date }}</p>
+</div>
+
+<div class="grid-portal">
+    <!-- Left Column: Selfie Upload & Matching State -->
+    <div class="glass-card selfie-card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 20px;">Find Your Photos</h2>
+        
+        <div class="selfie-preview-container" id="selfie-preview">
+            {% if has_selfie %}
+                <img src="{{ selfie_url }}" class="selfie-img" alt="Selfie Reference">
+            {% else %}
+                <span class="selfie-placeholder">👤</span>
+            {% endif %}
+        </div>
+
+        <form id="selfie-form" style="display: none;">
+            <input type="file" id="selfie-input" accept="image/*" required>
+        </form>
+
+        <label for="selfie-input" class="file-input-label">
+            {% if has_selfie %}Change Selfie{% else %}Upload Selfie{% endif %}
+        </label>
+
+        <!-- Dynamic Matching Progress UI -->
+        <div class="progress-box" id="progress-container">
+            <div class="progress-status">
+                <div class="progress-dot"></div>
+                <span id="progress-title">AI Matching...</span>
+            </div>
+            <p class="progress-desc" id="progress-message">Scanning gallery for your face...</p>
+        </div>
+    </div>
+
+    <!-- Right Column: Photos Grid -->
+    <div class="glass-card gallery-container">
+        <h2 class="gallery-title">Your Personal Gallery</h2>
+        
+        <div class="photo-grid" id="gallery-grid">
+            {% if not has_selfie %}
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; color: var(--text-muted);">
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">Please upload a selfie to find your wedding photos.</p>
+                    <p style="font-size: 0.9rem;">Our face-recognition engine will filter the gallery for your pictures.</p>
+                </div>
+            {% elif not matched_photos %}
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; color: var(--text-muted);">
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">No matching photos found yet.</p>
+                    <p style="font-size: 0.9rem;">You'll receive a push notification here as soon as matching is completed.</p>
+                </div>
+            {% else %}
+                {% for photo in matched_photos %}
+                    <div class="photo-card" onclick="openLightbox('{{ photo.image.url }}')">
+                        <img src="{{ photo.image.url }}" alt="Matched Photo">
+                        <div class="photo-overlay">
+                            <span style="font-size: 0.85rem; font-weight: 600;">EventLens AI Match</span>
+                            <a href="{{ photo.image.url }}" download class="btn-download-sm" onclick="event.stopPropagation()">Download</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div id="lightbox" class="modal" onclick="closeLightbox()">
+    <button class="modal-close" onclick="closeLightbox()">&times;</button>
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <img id="lightbox-img" src="" alt="Preview">
+    </div>
+    <div class="modal-actions" onclick="event.stopPropagation()">
+        <a id="lightbox-download" href="" download class="btn-primary">Download High-Res</a>
+    </div>
+</div>
+
+<script>
+    // 1. Establish WebSocket Connection for real-time progress notifications
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws_path = ws_scheme + '://' + window.location.host + '/ws/notifications/';
+    const socket = new WebSocket(ws_path);
+
+    const progressContainer = document.getElementById('progress-container');
+    const progressTitle = document.getElementById('progress-title');
+    const progressMessage = document.getElementById('progress-message');
+
+    socket.onopen = function() {
+        console.log("WebSocket connected for guest notifications.");
+    };
+
+    socket.onmessage = function(e) {
+        console.log("Received update:", e.data);
+        const data = JSON.parse(e.data);
+        
+        // Match progress status
+        if (data.title && data.message && data.message.startsWith("STATUS:")) {
+            progressContainer.style.display = 'block';
+            
+            // Format example: STATUS: PROCESSING. Extracting face embedding...
+            const cleanMsg = data.message.replace(/STATUS:\s[A-Z]+\.\s/, "");
+            progressTitle.innerText = data.title;
+            progressMessage.innerText = cleanMsg;
+
+            if (data.message.includes("STATUS: SUCCESS")) {
+                setTimeout(() => {
+                    // Refresh gallery grid to show the matched pictures!
+                    location.reload();
+                }, 1500);
+            }
+        }
+    };
+
+    // 2. Handle Selfie AJAX Upload
+    const selfieInput = document.getElementById('selfie-input');
+    selfieInput.addEventListener('change', function(e) {
+        if (selfieInput.files.length === 0) return;
+
+        const file = selfieInput.files[0];
+        const formData = new FormData();
+        formData.append('selfie', file);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        // Show local preview immediately
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('selfie-preview');
+            preview.innerHTML = `<img src="${e.target.result}" class="selfie-img">`;
+        };
+        reader.readAsDataURL(file);
+
+        // Show progress box
+        progressContainer.style.display = 'block';
+        progressTitle.innerText = 'Uploading Selfie...';
+        progressMessage.innerText = 'Sending your reference photo to the server.';
+
+        // POST upload
+        fetch('{% url "upload_selfie" event.slug %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                progressTitle.innerText = 'Selfie Uploaded';
+                progressMessage.innerText = 'Queued background matching process.';
+            } else {
+                progressTitle.innerText = 'Upload Error';
+                progressMessage.innerText = data.message;
+            }
+        })
+        .catch(err => {
+            console.error("Selfie upload failed:", err);
+            progressTitle.innerText = 'Connection Error';
+            progressMessage.innerText = 'Failed to communicate with face engine.';
+        });
+    });
+
+    // 3. Lightbox Modal Functions
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxDownload = document.getElementById('lightbox-download');
+
+    function openLightbox(url) {
+        lightboxImg.src = url;
+        lightboxDownload.href = url;
+        lightbox.style.display = 'flex';
+    }
+
+    function closeLightbox() {
+        lightbox.style.display = 'none';
+        lightboxImg.src = '';
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeLightbox();
+        }
+    });
+</script>
+{% endblock %}

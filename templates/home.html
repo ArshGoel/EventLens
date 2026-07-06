@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | AI Wedding Photo Delivery{% endblock %}
+
+{% block content %}
+<style>
+    .hero-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 60px 0;
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 20px;
+        letter-spacing: -0.03em;
+    }
+
+    .hero-title span {
+        background: var(--primary-glow);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .hero-description {
+        max-width: 600px;
+        font-size: 1.2rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin-bottom: 40px;
+    }
+
+    .options-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        max-width: 800px;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .options-grid {
+            grid-template-columns: 1fr;
+        }
+        .hero-title {
+            font-size: 2.5rem;
+        }
+    }
+
+    .option-card {
+        transition: transform 0.3s, border-color 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        height: 280px;
+        text-align: center;
+    }
+
+    .option-card:hover {
+        transform: translateY(-5px);
+        border-color: #6366f1;
+    }
+
+    .option-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+    }
+
+    .option-title {
+        font-size: 1.4rem;
+        margin-bottom: 10px;
+    }
+
+    .option-desc {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.4;
+        margin-bottom: 20px;
+        flex-grow: 1;
+    }
+</style>
+
+<div class="hero-section">
+    <h1 class="hero-title">Find Your Wedding Photos <span>Instantly</span></h1>
+    <p class="hero-description">
+        Photographers upload galleries. Guests upload a single selfie. Our AI matches face vectors to deliver your moments directly to you.
+    </p>
+
+    <div class="options-grid">
+        <!-- Photographer Card -->
+        <div class="glass-card option-card">
+            <div>
+                <div class="option-icon">📷</div>
+                <h2 class="option-title">For Photographers</h2>
+                <p class="option-desc">Create wedding events, lock galleries with passcodes, and upload bulk photos to let AI index them.</p>
+            </div>
+            {% if user.is_authenticated and user.profile.is_photographer %}
+                <a href="{% url 'photographer_dashboard' %}" class="btn-primary" style="width: 100%;">Go to Dashboard</a>
+            {% else %}
+                <a href="{% url 'register' %}?role=photographer" class="btn-primary" style="width: 100%;">Photographer Sign Up</a>
+            {% endif %}
+        </div>
+
+        <!-- Guest Card -->
+        <div class="glass-card option-card">
+            <div>
+                <div class="option-icon">✨</div>
+                <h2 class="option-title">For Guests</h2>
+                <p class="option-desc">Have you been invited to a wedding? Join, upload a selfie, and see all photos of you in real-time.</p>
+            </div>
+            {% if user.is_authenticated %}
+                <a href="{% url 'register' %}" class="btn-primary" style="width: 100%; display: none;">Guest Portal</a>
+                <span class="text-muted" style="font-size: 0.9rem;">Logged in as <strong>{{ user.username }}</strong>. Enter a wedding URL to find your photos!</span>
+            {% else %}
+                <a href="{% url 'register' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Sign Up</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

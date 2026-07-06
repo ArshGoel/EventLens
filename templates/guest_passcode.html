@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | Protected Gallery{% endblock %}
+
+{% block content %}
+<style>
+    .passcode-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 50vh;
+    }
+
+    .passcode-card {
+        max-width: 450px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .lock-icon {
+        font-size: 3rem;
+        margin-bottom: 20px;
+    }
+
+    .title {
+        font-size: 1.8rem;
+        margin-bottom: 8px;
+    }
+
+    .desc {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-bottom: 30px;
+        line-height: 1.4;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        padding: 14px 18px;
+        border-radius: 12px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 1.2rem;
+        text-align: center;
+        letter-spacing: 0.1em;
+        outline: none;
+        transition: border-color 0.3s;
+    }
+
+    input:focus {
+        border-color: #6366f1;
+    }
+</style>
+
+<div class="passcode-container">
+    <div class="glass-card passcode-card">
+        <div class="lock-icon">🔒</div>
+        <h2 class="title">{{ event.name }}</h2>
+        <p class="desc">This wedding gallery is passcode protected. Please enter the passcode provided by the couple or photographer to view your photos.</p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <input type="password" name="passcode" placeholder="ENTER PASSCODE" required autocomplete="off">
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%;">Access Gallery</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
