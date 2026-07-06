@@ -10,3 +10,14 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
+
+
+class GoogleDriveCredential(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='google_drive_credential')
+    token = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Google Drive Credential for {self.user.username}"
+

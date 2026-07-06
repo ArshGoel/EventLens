@@ -107,8 +107,14 @@ def photographer_dashboard(request):
         messages.success(request, f"Event '{name}' created successfully!")
         return redirect('photographer_dashboard')
 
+    from Accounts.models import GoogleDriveCredential
+    google_drive_connected = GoogleDriveCredential.objects.filter(user=request.user).exists()
     events = Event.objects.filter(photographer=request.user).order_by('-created_at')
-    return render(request, 'photographer_dashboard.html', {'events': events})
+    return render(request, 'photographer_dashboard.html', {
+        'events': events,
+        'google_drive_connected': google_drive_connected
+    })
+
 
 
 @login_required

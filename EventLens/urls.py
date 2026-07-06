@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from Accounts import views as ac_views
 from Dashboards import views as dash_views
+from Dashboards import google_drive as gd_views
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -35,7 +36,15 @@ urlpatterns = [
     path('dashboard/upload/<int:event_id>/', dash_views.upload_photos, name='upload_photos'),
     path('event/<slug:slug>/', dash_views.guest_portal, name='guest_portal'),
     path('event/<slug:slug>/upload-selfie/', dash_views.upload_selfie, name='upload_selfie'),
+
+    # Google Drive Routes
+    path('google-drive/connect/', gd_views.google_drive_auth_init, name='google_drive_connect'),
+    path('google-drive/callback/', gd_views.google_drive_auth_callback, name='google_drive_callback'),
+    path('google-drive/disconnect/', gd_views.google_drive_disconnect, name='google_drive_disconnect'),
+    path('google-drive/folders/', gd_views.google_drive_list_folders, name='google_drive_folders'),
+    path('google-drive/import/', gd_views.google_drive_import_photos, name='google_drive_import'),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

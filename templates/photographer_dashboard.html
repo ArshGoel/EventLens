@@ -128,31 +128,122 @@
     .dropzone .dz-preview .dz-details {
         background-color: #1e293b !important;
     }
+
+    /* Toast Notifications */
+    #notification-box {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        width: 360px;
+        max-width: calc(100vw - 60px);
+    }
+
+    .toast {
+        background: rgba(15, 23, 42, 0.9);
+        border-left: 4px solid #a855f7;
+        border-radius: 12px;
+        padding: 20px;
+        color: var(--text-main);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        transform: translateX(120%);
+        animation: slideIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    @keyframes slideIn {
+        to { transform: translateX(0); }
+    }
+
+    .toast.hide {
+        animation: slideOut 0.35s ease forwards;
+    }
+
+    @keyframes slideOut {
+        to { transform: translateX(120%); opacity: 0; }
+    }
+
+    .toast-title {
+        font-weight: 700;
+        font-size: 1.0rem;
+    }
+
+    .toast-message {
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
 </style>
 
 <div class="dashboard-grid">
-    <!-- Left Column: Create Event -->
-    <div class="glass-card" style="height: fit-content;">
-        <h2 class="form-title">Create Wedding Event</h2>
-        <form method="POST">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="name">Wedding Name</label>
-                <input type="text" id="name" name="name" placeholder="e.g. John & Jane Wedding" required>
-            </div>
+    <!-- Left Column: Create Event & Integrations -->
+    <div style="display: flex; flex-direction: column; gap: 30px; height: fit-content;">
+        <div class="glass-card">
+            <h2 class="form-title">Create Wedding Event</h2>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="name">Wedding Name</label>
+                    <input type="text" id="name" name="name" placeholder="e.g. John & Jane Wedding" required>
+                </div>
 
-            <div class="form-group">
-                <label for="date">Wedding Date</label>
-                <input type="date" id="date" name="date" required>
-            </div>
+                <div class="form-group">
+                    <label for="date">Wedding Date</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
 
-            <div class="form-group">
-                <label for="passcode">Gallery Passcode (Optional)</label>
-                <input type="text" id="passcode" name="passcode" placeholder="e.g. 1234">
-            </div>
+                <div class="form-group">
+                    <label for="passcode">Gallery Passcode (Optional)</label>
+                    <input type="text" id="passcode" name="passcode" placeholder="e.g. 1234">
+                </div>
 
-            <button type="submit" class="btn-primary" style="width: 100%;">Create Event</button>
-        </form>
+                <button type="submit" class="btn-primary" style="width: 100%;">Create Event</button>
+            </form>
+        </div>
+
+        <div class="glass-card">
+            <h2 class="form-title" style="margin-bottom: 15px; font-size: 1.2rem;">Google Drive Connection</h2>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <span style="font-size: 0.95rem; font-weight: 600;">Status:</span>
+                        {% if google_drive_connected %}
+                            <span style="color: var(--success); font-weight: bold; margin-left: 5px;">Connected</span>
+                        {% else %}
+                            <span style="color: var(--text-muted); margin-left: 5px;">Disconnected</span>
+                        {% endif %}
+                    </div>
+                    {% if google_drive_connected %}
+                        <form action="{% url 'google_drive_disconnect' %}" method="POST" style="margin: 0;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-sm" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--error) !important; box-shadow: none;">
+                                Disconnect
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'google_drive_connect' %}" class="btn-sm" style="text-decoration: none; text-align: center;">
+                            Connect
+                        </a>
+                    {% endif %}
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                    {% if google_drive_connected %}
+                        You can now import photos directly from your Google Drive folders into any of your events.
+                    {% else %}
+                        Link your Google Drive account to import files directly from folders without downloading/uploading them manually.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
     </div>
 
     <!-- Right Column: Events List & Upload Manager -->
@@ -183,6 +274,11 @@
                             <button onclick="toggleUploadZone({{ event.id }})" class="btn-sm" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main) !important; box-shadow: none;">
                                 Bulk Upload Photos
                             </button>
+                            {% if google_drive_connected %}
+                                <button onclick="toggleGDriveZone({{ event.id }})" class="btn-sm" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); color: #818cf8 !important; box-shadow: none;">
+                                    Import from Drive
+                                </button>
+                            {% endif %}
                             <a href="{% url 'guest_portal' event.slug %}" target="_blank" class="btn-sm" style="text-align: center; display: inline-block;">
                                 View Portal ↗
                             </a>
@@ -197,6 +293,20 @@
                                 </div>
                             </form>
                         </div>
+
+                        <!-- Google Drive Import Area -->
+                        {% if google_drive_connected %}
+                        <div id="gdrive-zone-{{ event.id }}" class="dropzone-container" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                            <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-main);">Import Photos from Google Drive Folder</h4>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="gdrive-folder-{{ event.id }}" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
+                                    <option value="">Loading folders...</option>
+                                </select>
+                                <button onclick="startGDriveImport({{ event.id }})" class="btn-sm" style="height: 42px;">Import</button>
+                            </div>
+                            <div id="gdrive-status-{{ event.id }}" style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); display: none; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px;"></div>
+                        </div>
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
@@ -212,6 +322,10 @@
 
     function toggleUploadZone(eventId) {
         const zone = document.getElementById(`upload-zone-${eventId}`);
+        // Hide Google Drive zone if active to prevent clutter
+        const gdZone = document.getElementById(`gdrive-zone-${eventId}`);
+        if (gdZone) gdZone.style.display = 'none';
+
         if (zone.style.display === 'block') {
             zone.style.display = 'none';
         } else {
@@ -245,5 +359,149 @@
             }
         }
     }
+
+    // Google Drive Integration JavaScript
+    const loadedFolders = {};
+
+    function toggleGDriveZone(eventId) {
+        const zone = document.getElementById(`gdrive-zone-${eventId}`);
+        // Hide Dropzone if active to prevent clutter
+        const uploadZone = document.getElementById(`upload-zone-${eventId}`);
+        if (uploadZone) uploadZone.style.display = 'none';
+
+        if (zone.style.display === 'block') {
+            zone.style.display = 'none';
+        } else {
+            zone.style.display = 'block';
+            
+            // Fetch folders if not already loaded
+            if (!loadedFolders[eventId]) {
+                const selectEl = document.getElementById(`gdrive-folder-${eventId}`);
+                fetch('/google-drive/folders/')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            selectEl.innerHTML = '<option value="">-- Select a Folder --</option>';
+                            if (data.folders.length === 0) {
+                                selectEl.innerHTML = '<option value="">No folders found in Google Drive</option>';
+                            } else {
+                                data.folders.forEach(folder => {
+                                    selectEl.innerHTML += `<option value="${folder.id}">${folder.name}</option>`;
+                                });
+                            }
+                            loadedFolders[eventId] = true;
+                        } else {
+                            selectEl.innerHTML = `<option value="">Error: ${data.message}</option>`;
+                        }
+                    })
+                    .catch(err => {
+                        selectEl.innerHTML = '<option value="">Failed to load folders.</option>';
+                        console.error(err);
+                    });
+            }
+        }
+    }
+
+    function startGDriveImport(eventId) {
+        const folderSelect = document.getElementById(`gdrive-folder-${eventId}`);
+        const folderId = folderSelect.value;
+        const statusEl = document.getElementById(`gdrive-status-${eventId}`);
+        
+        if (!folderId) {
+            alert("Please select a Google Drive folder first.");
+            return;
+        }
+
+        statusEl.style.display = 'block';
+        statusEl.innerText = "Queueing import task...";
+        
+        fetch('/google-drive/import/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                event_id: eventId,
+                folder_id: folderId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                statusEl.innerText = "Task queued. Syncing in background...";
+            } else {
+                statusEl.innerText = `Error: ${data.message}`;
+            }
+        })
+        .catch(err => {
+            statusEl.innerText = "Network error queueing import.";
+            console.error(err);
+        });
+    }
+
+    // Live Toast Notifications Container setup
+    const notificationBox = document.createElement('div');
+    notificationBox.id = 'notification-box';
+    document.body.appendChild(notificationBox);
+
+    function showToast(title, message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+        `;
+        
+        notificationBox.appendChild(toast);
+
+        // Automatically slide out and remove after 6 seconds
+        setTimeout(() => {
+            toast.classList.add('hide');
+            setTimeout(() => {
+                toast.remove();
+            }, 350);
+        }, 6000);
+    }
+
+    // Connect WebSocket
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws_path = ws_scheme + '://' + window.location.host + '/ws/notifications/';
+    console.log("Photographer Dashboard connecting WebSocket to:", ws_path);
+    const socket = new WebSocket(ws_path);
+
+    socket.onopen = function(e) {
+        console.log("WebSocket connection established!");
+    };
+
+    socket.onmessage = function(e) {
+        console.log("Received websocket message:", e.data);
+        const data = JSON.parse(e.data);
+        showToast(data.title, data.message);
+        
+        // Dynamically update status elements
+        if (data.title === "Google Drive Import") {
+            document.querySelectorAll('[id^="gdrive-status-"]').forEach(el => {
+                if (el.style.display === 'block' && !el.innerText.includes("SUCCESS") && !el.innerText.includes("ERROR")) {
+                    el.innerText = data.message;
+                }
+            });
+            
+            // Reload page on success to show fresh numbers
+            if (data.message.includes("Successfully imported")) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2500);
+            }
+        }
+    };
+
+    socket.onclose = function(e) {
+        console.log("WebSocket connection closed.");
+    };
+
+    socket.onerror = function(e) {
+        console.error("WebSocket error:", e);
+    };
 </script>
 {% endblock %}
