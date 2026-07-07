@@ -130,3 +130,19 @@ GOOGLE_DRIVE_CLIENT_ID = os.environ.get('GOOGLE_DRIVE_CLIENT_ID')
 GOOGLE_DRIVE_CLIENT_SECRET = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET')
 GOOGLE_DRIVE_REDIRECT_URI = os.environ.get('GOOGLE_DRIVE_REDIRECT_URI', 'http://localhost:8000/google-drive/callback/')
 
+# Cloudinary Settings
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET')
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Face Recognition Engine Settings
+INSIGHTFACE_MODEL_NAME = os.environ.get('INSIGHTFACE_MODEL_NAME', 'buffalo_l')
+FACE_ENGINE_CTX_ID = int(os.environ.get('FACE_ENGINE_CTX_ID', '-1'))
+FACE_DETECTION_SIZE = int(os.environ.get('FACE_DETECTION_SIZE', '480'))
+
+# Google API Key (for Picker)
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '') 
+

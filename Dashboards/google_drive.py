@@ -137,7 +137,7 @@ def google_drive_list_folders(request):
         results = service.files().list(
             q="mimeType='application/vnd.google-apps.folder' and trashed=false",
             spaces='drive',
-            fields="nextPageToken, files(id, name)",
+            fields="nextPageToken, files(id, name, parents)",
             pageSize=100
         ).execute()
         

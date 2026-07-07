@@ -198,3 +198,177 @@ def upload_selfie(request, slug):
         })
 
     return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
+
+@login_required
+def request_hd_photo_bulk(request, slug):
+    """
+    Handles requesting HD download links for multiple photos.
+    Saves HDRequest entries and runs email delivery task.
+    """
+    from FaceEngine.models import HDRequest
+    from FaceEngine.tasks import send_hd_requests_email_task
+    
+    event = get_object_or_death(Event, slug=slug)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            photo_ids = data.get('photo_ids', [])
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON.'}, status=400)
+            
+        if not photo_ids:
+            return JsonResponse({'status': 'error', 'message': 'No photos selected.'}, status=400)
+            
+        # Get valid photos in this event
+        photos = Photo.objects.filter(id__in=photo_ids, event=event)
+        
+        requests_created = 0
+        for photo in photos:
+            # Save request as PENDING
+            HDRequest.objects.get_or_create(
+                event=event,
+                guest=request.user,
+                photo=photo,
+                defaults={'status': 'PENDING'}
+            )
+            requests_created += 1
+            
+        if requests_created > 0:
+            # Trigger celery background task to send the email!
+            send_hd_requests_email_task.delay(request.user.id, event.id)
+            
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Your request for {requests_created} HD photos has been received. Download links will be sent to your email ({request.user.email}) by end of day!'
+        })
+        
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+@login_required
+def delete_event(request, event_id):
+    """
+    Deletes the event and its associated photos.
+    """
+    from django.conf import settings
+    event = get_object_or_death(Event, id=event_id, photographer=request.user)
+    if request.method == 'POST':
+        # Delete photos first to trigger cleanup
+        photos = Photo.objects.filter(event=event)
+        for photo in photos:
+            # Delete local file if it exists
+            if photo.image:
+                try:
+                    photo.image.delete(save=False)
+                except Exception:
+                    pass
+            # If Cloudinary is connected and photo has image_url, delete it from Cloudinary
+            if photo.image_url and 'res.cloudinary.com' in photo.image_url:
+                try:
+                    import cloudinary
+                    import cloudinary.uploader
+                    cloudinary.config(
+                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                        api_key=settings.CLOUDINARY_API_KEY,
+                        api_secret=settings.CLOUDINARY_API_SECRET,
+                        secure=True
+                    )
+                    # Extract public_id
+                    public_id = photo.image_url.split('/upload/')[1].split('/', 1)[1].rsplit('.', 1)[0]
+                    cloudinary.uploader.destroy(public_id)
+                except Exception:
+                    pass
+        
+        event.delete()
+        return JsonResponse({'status': 'success', 'message': 'Event deleted successfully.'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+@login_required
+def edit_event(request, event_id):
+    """
+    Edits event name, date, and passcode.
+    """
+    event = get_object_or_death(Event, id=event_id, photographer=request.user)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name')
+            date = data.get('date')
+            passcode = data.get('passcode', '')
+        except Exception:
+            name = request.POST.get('name')
+            date = request.POST.get('date')
+            passcode = request.POST.get('passcode', '')
+
+        if not name or not date:
+            return JsonResponse({'status': 'error', 'message': 'Name and Date are required.'}, status=400)
+
+        event.name = name
+        event.date = date
+        event.passcode = passcode
+        event.save()
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Event updated successfully.',
+            'event': {
+                'name': event.name,
+                'date': str(event.date),
+                'passcode': event.passcode
+            }
+        })
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+@login_required
+def list_event_photos(request, event_id):
+    """
+    Lists all photos associated with an event.
+    """
+    event = get_object_or_death(Event, id=event_id, photographer=request.user)
+    photos = Photo.objects.filter(event=event).order_by('-uploaded_at')
+    
+    photo_list = []
+    for photo in photos:
+        photo_list.append({
+            'id': photo.id,
+            'preview_url': photo.preview_url,
+            'uploaded_at': photo.uploaded_at.strftime('%Y-%m-%d %H:%M')
+        })
+        
+    return JsonResponse({
+        'status': 'success',
+        'photos': photo_list
+    })
+
+@login_required
+def delete_photo(request, photo_id):
+    """
+    Deletes a single photo.
+    """
+    from django.conf import settings
+    photo = get_object_or_death(Photo, id=photo_id, event__photographer=request.user)
+    if request.method == 'POST':
+        # Delete local file
+        if photo.image:
+            try:
+                photo.image.delete(save=False)
+            except Exception:
+                pass
+        # Delete from Cloudinary if applicable
+        if photo.image_url and 'res.cloudinary.com' in photo.image_url:
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                    api_key=settings.CLOUDINARY_API_KEY,
+                    api_secret=settings.CLOUDINARY_API_SECRET,
+                    secure=True
+                )
+                public_id = photo.image_url.split('/upload/')[1].split('/', 1)[1].rsplit('.', 1)[0]
+                cloudinary.uploader.destroy(public_id)
+            except Exception:
+                pass
+                
+        photo.delete()
+        return JsonResponse({'status': 'success', 'message': 'Photo deleted successfully.'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)

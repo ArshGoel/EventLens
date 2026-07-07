@@ -18,3 +18,13 @@ class GuestMatch(models.Model):
 
     class Meta:
         unique_together = ('guest', 'photo')
+
+class HDRequest(models.Model):
+    event = models.ForeignKey('Events.Event', on_delete=models.CASCADE, related_name='hd_requests')
+    guest = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hd_requests')
+    photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name='hd_requests')
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default='PENDING', choices=[('PENDING', 'Pending'), ('SENT', 'Sent')])
+
+    class Meta:
+        unique_together = ('guest', 'photo')

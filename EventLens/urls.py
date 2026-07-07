@@ -34,8 +34,13 @@ urlpatterns = [
     path('logout/', dash_views.logout_view, name='logout'),
     path('dashboard/photographer/', dash_views.photographer_dashboard, name='photographer_dashboard'),
     path('dashboard/upload/<int:event_id>/', dash_views.upload_photos, name='upload_photos'),
+    path('dashboard/event/<int:event_id>/delete/', dash_views.delete_event, name='delete_event'),
+    path('dashboard/event/<int:event_id>/edit/', dash_views.edit_event, name='edit_event'),
+    path('dashboard/event/<int:event_id>/photos/', dash_views.list_event_photos, name='list_event_photos'),
+    path('dashboard/photo/<int:photo_id>/delete/', dash_views.delete_photo, name='delete_photo'),
     path('event/<slug:slug>/', dash_views.guest_portal, name='guest_portal'),
     path('event/<slug:slug>/upload-selfie/', dash_views.upload_selfie, name='upload_selfie'),
+    path('event/<slug:slug>/request-hd/', dash_views.request_hd_photo_bulk, name='request_hd_photo_bulk'),
 
     # Google Drive Routes
     path('google-drive/connect/', gd_views.google_drive_auth_init, name='google_drive_connect'),

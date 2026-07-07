@@ -270,15 +270,24 @@
                             </div>
                         </div>
 
-                        <div class="event-actions">
+                        <div class="event-actions" style="flex-wrap: wrap;">
                             <button onclick="toggleUploadZone({{ event.id }})" class="btn-sm" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main) !important; box-shadow: none;">
-                                Bulk Upload Photos
+                                Bulk Upload
                             </button>
                             {% if google_drive_connected %}
                                 <button onclick="toggleGDriveZone({{ event.id }})" class="btn-sm" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); color: #818cf8 !important; box-shadow: none;">
-                                    Import from Drive
+                                    Import Drive
                                 </button>
                             {% endif %}
+                            <button onclick="togglePhotosDrawer({{ event.id }})" class="btn-sm" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); color: #c084fc !important; box-shadow: none;">
+                                View/Manage Photos
+                            </button>
+                            <button onclick="openEditModal({{ event.id }}, '{{ event.name|escapejs }}', '{{ event.date|date:"Y-m-d" }}', '{{ event.passcode|escapejs }}')" class="btn-sm" style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); color: #facc15 !important; box-shadow: none;">
+                                Edit
+                            </button>
+                            <button onclick="deleteEvent({{ event.id }}, '{{ event.name|escapejs }}')" class="btn-sm" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171 !important; box-shadow: none;">
+                                Delete
+                            </button>
                             <a href="{% url 'guest_portal' event.slug %}" target="_blank" class="btn-sm" style="text-align: center; display: inline-block;">
                                 View Portal ↗
                             </a>
@@ -296,7 +305,7 @@
 
                         <!-- Google Drive Import Area -->
                         {% if google_drive_connected %}
-                        <div id="gdrive-zone-{{ event.id }}" class="dropzone-container" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                        <div id="gdrive-zone-{{ event.id }}" class="dropzone-container" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px; display: none;">
                             <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-main);">Import Photos from Google Drive Folder</h4>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <select id="gdrive-folder-{{ event.id }}" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
@@ -307,6 +316,18 @@
                             <div id="gdrive-status-{{ event.id }}" style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); display: none; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px;"></div>
                         </div>
                         {% endif %}
+
+                        <!-- Photos Drawer Container -->
+                        <div id="photos-drawer-{{ event.id }}" class="dropzone-container" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                            <h4 style="font-size: 0.95rem; margin-bottom: 15px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center;">
+                                <span>Gallery Photos</span>
+                                <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);" id="drawer-count-{{ event.id }}">0 photos</span>
+                            </h4>
+                            
+                            <div id="drawer-grid-{{ event.id }}" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-height: 350px; overflow-y: auto; padding: 5px;">
+                                <!-- Dynamic Photos List loaded via AJAX -->
+                            </div>
+                        </div>
                     </div>
                 {% endfor %}
             </div>
@@ -381,13 +402,45 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.status === 'success') {
-                            selectEl.innerHTML = '<option value="">-- Select a Folder --</option>';
+                            selectEl.innerHTML = '';
                             if (data.folders.length === 0) {
                                 selectEl.innerHTML = '<option value="">No folders found in Google Drive</option>';
                             } else {
-                                data.folders.forEach(folder => {
-                                    selectEl.innerHTML += `<option value="${folder.id}">${folder.name}</option>`;
+                                // Build a parent-child map for hierarchical reconstruction
+                                const folderMap = new Map();
+                                data.folders.forEach(f => {
+                                    folderMap.set(f.id, { ...f, children: [] });
                                 });
+
+                                const rootFolders = [];
+                                data.folders.forEach(f => {
+                                    const current = folderMap.get(f.id);
+                                    const parentId = f.parents && f.parents.length > 0 ? f.parents[0] : null;
+
+                                    if (parentId && folderMap.has(parentId)) {
+                                        folderMap.get(parentId).children.push(current);
+                                    } else {
+                                        rootFolders.push(current);
+                                    }
+                                });
+
+                                selectEl.innerHTML = '<option value="">-- Select a Folder --</option>';
+                                
+                                // Recursively append option elements with visual indentation
+                                function addOptions(folders, depth = 0) {
+                                    folders.forEach(folder => {
+                                        const indent = "\u00A0\u00A0\u00A0\u00A0".repeat(depth) + (depth > 0 ? "└─ " : "📁 ");
+                                        const opt = document.createElement('option');
+                                        opt.value = folder.id;
+                                        opt.textContent = indent + folder.name;
+                                        selectEl.appendChild(opt);
+
+                                        if (folder.children.length > 0) {
+                                            addOptions(folder.children, depth + 1);
+                                        }
+                                    });
+                                }
+                                addOptions(rootFolders);
                             }
                             loadedFolders[eventId] = true;
                         } else {
@@ -503,5 +556,294 @@
     socket.onerror = function(e) {
         console.error("WebSocket error:", e);
     };
+
+    // --- MANAGEMENT DRAWERS AND MODALS FUNCTIONALITY ---
+
+    // 1. Photos drawer logic
+    function togglePhotosDrawer(eventId) {
+        const drawer = document.getElementById(`photos-drawer-${eventId}`);
+        
+        // Hide other zones to prevent clutter
+        const uploadZone = document.getElementById(`upload-zone-${eventId}`);
+        if (uploadZone) uploadZone.style.display = 'none';
+        const gdZone = document.getElementById(`gdrive-zone-${eventId}`);
+        if (gdZone) gdZone.style.display = 'none';
+
+        if (drawer.style.display === 'block') {
+            drawer.style.display = 'none';
+        } else {
+            drawer.style.display = 'block';
+            loadDrawerPhotos(eventId);
+        }
+    }
+
+    function loadDrawerPhotos(eventId) {
+        const grid = document.getElementById(`drawer-grid-${eventId}`);
+        const countSpan = document.getElementById(`drawer-count-${eventId}`);
+        
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 20px;">Loading photos...</div>';
+        
+        fetch(`/dashboard/event/${eventId}/photos/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    countSpan.innerText = `${data.photos.length} photos`;
+                    if (data.photos.length === 0) {
+                        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 0.9rem; padding: 20px;">No photos uploaded yet.</div>';
+                    } else {
+                        grid.innerHTML = '';
+                        data.photos.forEach(photo => {
+                            const card = document.createElement('div');
+                            card.className = 'drawer-photo-card';
+                            card.id = `drawer-photo-${photo.id}`;
+                            card.innerHTML = `
+                                <button class="drawer-photo-delete" onclick="deleteDrawerPhoto(${photo.id}, ${eventId})" title="Delete photo">&times;</button>
+                                <img src="${photo.preview_url}" alt="Wedding Photo">
+                            `;
+                            grid.appendChild(card);
+                        });
+                    }
+                } else {
+                    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--error); font-size: 0.9rem; padding: 20px;">Error: ${data.message}</div>`;
+                }
+            })
+            .catch(err => {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--error); font-size: 0.9rem; padding: 20px;">Failed to load photos.</div>';
+                console.error(err);
+            });
+    }
+
+    function deleteDrawerPhoto(photoId, eventId) {
+        if (!confirm("Are you sure you want to delete this photo permanently?")) return;
+
+        fetch(`/dashboard/photo/${photoId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const card = document.getElementById(`drawer-photo-${photoId}`);
+                if (card) {
+                    card.style.transition = 'opacity 0.3s';
+                    card.style.opacity = '0';
+                    setTimeout(() => {
+                        card.remove();
+                        // Update counts dynamically
+                        const countEl = document.getElementById(`photo-count-${eventId}`);
+                        if (countEl) {
+                            const curCount = parseInt(countEl.innerText);
+                            countEl.innerText = Math.max(0, curCount - 1);
+                        }
+                        const drawerCountEl = document.getElementById(`drawer-count-${eventId}`);
+                        if (drawerCountEl) {
+                            const curCount = parseInt(drawerCountEl.innerText);
+                            drawerCountEl.innerText = `${Math.max(0, curCount - 1)} photos`;
+                        }
+                    }, 300);
+                }
+                showToast("Success", "Photo deleted successfully.");
+            } else {
+                alert("Failed to delete photo: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error communicating with server.");
+        });
+    }
+
+    // 2. Edit Event Logic
+    const editModal = document.getElementById('edit-event-modal');
+    const editEventId = document.getElementById('edit-event-id');
+    const editName = document.getElementById('edit-name');
+    const editDate = document.getElementById('edit-date');
+    const editPasscode = document.getElementById('edit-passcode');
+
+    function openEditModal(id, name, date, passcode) {
+        editEventId.value = id;
+        editName.value = name;
+        editDate.value = date;
+        editPasscode.value = passcode;
+        editModal.style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        editModal.style.display = 'none';
+    }
+
+    function saveEventChanges() {
+        const id = editEventId.value;
+        const name = editName.value;
+        const date = editDate.value;
+        const passcode = editPasscode.value;
+
+        if (!name || !date) {
+            alert("Wedding Name and Date are required.");
+            return;
+        }
+
+        fetch(`/dashboard/event/${id}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                name: name,
+                date: date,
+                passcode: passcode
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast("Success", "Event updated successfully!");
+                closeEditModal();
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert("Failed to save changes: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error communicating with server.");
+        });
+    }
+
+    // 3. Delete Event Logic
+    function deleteEvent(eventId, eventName) {
+        if (!confirm(`WARNING: Are you sure you want to delete the wedding event "${eventName}"? All photos will be deleted permanently!`)) {
+            return;
+        }
+
+        fetch(`/dashboard/event/${eventId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast("Deleted", `Wedding event "${eventName}" deleted.`);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1200);
+            } else {
+                alert("Failed to delete event: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error communicating with server.");
+        });
+    }
 </script>
+
+<!-- Edit Event Modal -->
+<div id="edit-event-modal" class="edit-modal" onclick="closeEditModal()">
+    <div class="glass-card edit-modal-content" onclick="event.stopPropagation()">
+        <h3 style="font-size: 1.4rem; margin-bottom: 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>Edit Wedding Event</span>
+            <button onclick="closeEditModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </h3>
+        
+        <input type="hidden" id="edit-event-id">
+        
+        <div class="form-group">
+            <label for="edit-name">Wedding Name</label>
+            <input type="text" id="edit-name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="edit-date">Wedding Date</label>
+            <input type="date" id="edit-date" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="edit-passcode">Gallery Passcode</label>
+            <input type="text" id="edit-passcode" placeholder="Optional passcode">
+        </div>
+        
+        <div style="display: flex; gap: 15px; margin-top: 25px;">
+            <button class="btn-primary" onclick="saveEventChanges()" style="flex: 1; height: 46px;">Save Changes</button>
+            <button class="btn-secondary" onclick="closeEditModal()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); flex: 1; height: 46px;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Management Drawers and Modals styling */
+    .drawer-photo-card {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        background: rgba(0,0,0,0.2);
+    }
+    
+    .drawer-photo-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .drawer-photo-delete {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        border: none;
+        font-size: 0.75rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.2s;
+        z-index: 10;
+    }
+    
+    .drawer-photo-delete:hover {
+        transform: scale(1.15);
+        background: #ef4444;
+    }
+    
+    .edit-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    
+    .edit-modal-content {
+        max-width: 480px;
+        width: 100%;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        border: 1px solid var(--border-color);
+        animation: modalScaleUp 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+    
+    @keyframes modalScaleUp {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+</style>
 {% endblock %}

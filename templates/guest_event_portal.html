@@ -2,6 +2,11 @@
 
 {% block title %}EventLens | {{ event.name }} Gallery{% endblock %}
 
+{% block extra_head %}
+<!-- JSZip for client-side multi-image zipping -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <style>
     .portal-header {
@@ -142,6 +147,7 @@
         cursor: pointer;
         position: relative;
         background-color: rgba(255, 255, 255, 0.01);
+        transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     .photo-card img {
@@ -152,7 +158,41 @@
     }
 
     .photo-card:hover img {
-        transform: scale(1.05);
+        transform: scale(1.04);
+    }
+
+    /* Select Indicator styles */
+    .select-indicator {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.6);
+        background: rgba(15, 23, 42, 0.5);
+        z-index: 10;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    .photo-card.selected .select-indicator {
+        background-color: #6366f1;
+        border-color: #6366f1;
+    }
+
+    .photo-card.selected .select-indicator::after {
+        content: "✓";
+        color: white;
+        font-size: 0.85rem;
+        font-weight: 900;
+    }
+
+    .photo-card.selected {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
     }
 
     .photo-overlay {
@@ -165,20 +205,27 @@
         align-items: flex-end;
         justify-content: space-between;
         padding: 16px;
+        z-index: 5;
     }
 
     .photo-card:hover .photo-overlay {
         opacity: 1;
     }
 
-    .btn-download-sm {
-        background: white;
-        color: #0f172a;
+    .btn-view-sm {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
         padding: 6px 12px;
         border-radius: 6px;
         font-size: 0.8rem;
-        font-weight: 700;
-        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-view-sm:hover {
+        background: rgba(255, 255, 255, 0.25);
     }
 
     /* Lightbox Modal */
@@ -232,6 +279,57 @@
         display: flex;
         gap: 16px;
     }
+
+    /* Floating Selection Bar */
+    .selection-bar {
+        display: none;
+        position: fixed;
+        bottom: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(30, 41, 59, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        padding: 16px 28px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+        align-items: center;
+        gap: 30px;
+        transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .selection-bar.active {
+        display: flex;
+        bottom: 30px;
+    }
+
+    .selection-text {
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    .selection-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    /* Spin loader */
+    .spinner {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 10px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 </style>
 
 <div class="portal-header">
@@ -244,21 +342,30 @@
     <div class="glass-card selfie-card">
         <h2 style="font-size: 1.25rem; margin-bottom: 20px;">Find Your Photos</h2>
         
-        <div class="selfie-preview-container" id="selfie-preview">
-            {% if has_selfie %}
-                <img src="{{ selfie_url }}" class="selfie-img" alt="Selfie Reference">
-            {% else %}
-                <span class="selfie-placeholder">👤</span>
-            {% endif %}
+        <div class="selfie-preview-container" id="selfie-preview" style="position: relative;">
+            <video id="camera-feed" style="display: none; width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" autoplay playsinline></video>
+            <canvas id="camera-canvas" style="display: none;"></canvas>
+            <div id="preview-media" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;">
+                {% if has_selfie %}
+                    <img src="{{ selfie_url }}" class="selfie-img" alt="Selfie Reference">
+                {% else %}
+                    <span class="selfie-placeholder">👤</span>
+                {% endif %}
+            </div>
         </div>
 
         <form id="selfie-form" style="display: none;">
             <input type="file" id="selfie-input" accept="image/*" required>
         </form>
 
-        <label for="selfie-input" class="file-input-label">
-            {% if has_selfie %}Change Selfie{% else %}Upload Selfie{% endif %}
-        </label>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">
+            <label for="selfie-input" class="file-input-label" style="margin-top: 0; flex: 1; min-width: 100px; text-align: center;">
+                {% if has_selfie %}Change{% else %}Upload{% endif %}
+            </label>
+            <button id="btn-camera" class="file-input-label" style="margin-top: 0; flex: 1; min-width: 100px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer;">
+                Live Selfie
+            </button>
+        </div>
 
         <!-- Dynamic Matching Progress UI -->
         <div class="progress-box" id="progress-container">
@@ -287,11 +394,12 @@
                 </div>
             {% else %}
                 {% for photo in matched_photos %}
-                    <div class="photo-card" onclick="openLightbox('{{ photo.image.url }}')">
-                        <img src="{{ photo.image.url }}" alt="Matched Photo">
+                    <div class="photo-card" id="card-{{ photo.id }}" onclick="toggleSelectPhoto({{ photo.id }}, '{{ photo.preview_url }}', this)">
+                        <div class="select-indicator"></div>
+                        <img src="{{ photo.preview_url }}" alt="Matched Photo">
                         <div class="photo-overlay">
                             <span style="font-size: 0.85rem; font-weight: 600;">EventLens AI Match</span>
-                            <a href="{{ photo.image.url }}" download class="btn-download-sm" onclick="event.stopPropagation()">Download</a>
+                            <button class="btn-view-sm" onclick="event.stopPropagation(); openLightbox('{{ photo.preview_url }}')">View</button>
                         </div>
                     </div>
                 {% endfor %}
@@ -307,12 +415,49 @@
         <img id="lightbox-img" src="" alt="Preview">
     </div>
     <div class="modal-actions" onclick="event.stopPropagation()">
-        <a id="lightbox-download" href="" download class="btn-primary">Download High-Res</a>
+        <a id="lightbox-download" href="" download class="btn-primary">Download (Web Quality)</a>
+    </div>
+</div>
+
+<!-- Floating Action Bar -->
+<div id="selection-bar" class="selection-bar">
+    <span class="selection-text"><span id="selected-count">0</span> photos selected</span>
+    <div class="selection-actions">
+        <button class="btn-primary" onclick="openOptionsModal()">Download Options</button>
+        <button class="btn-secondary" onclick="clearSelection()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); height: 100%;">Clear</button>
+    </div>
+</div>
+
+<!-- Download Options Modal -->
+<div id="options-modal" class="modal" onclick="closeOptionsModal()">
+    <div class="glass-card modal-content" onclick="event.stopPropagation()" style="max-width: 500px; width: 100%; padding: 35px; text-align: center;">
+        <button class="modal-close" onclick="closeOptionsModal()">&times;</button>
+        <h3 style="font-size: 1.5rem; margin-bottom: 10px; font-weight: 800;">Select Download Quality</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 25px;">You have selected <strong id="modal-selected-count">0</strong> photos. Choose your download method:</p>
+        
+        <div id="modal-choices" style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Option 1: Instant Download -->
+            <button class="btn-primary" onclick="downloadSelectedInstant()" style="width: 100%; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+                <span style="font-size: 1.05rem; font-weight: 700;">Option 1: Download Instantly (Normal Quality)</span>
+                <span style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">Compressed copy downloads immediately as a ZIP file</span>
+            </button>
+            
+            <!-- Option 2: Request HD -->
+            <button class="btn-primary" onclick="requestSelectedHD()" style="width: 100%; padding: 18px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+                <span style="font-size: 1.05rem; font-weight: 700;">Option 2: Request HD Quality (Email)</span>
+                <span style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">Original high-res copies will be emailed by end of day</span>
+            </button>
+        </div>
+        
+        <div id="options-loader" style="display: none; margin-top: 20px;">
+            <div class="spinner"></div>
+            <p id="options-loader-text" style="font-size: 0.9rem; color: var(--text-muted);">Zipping photos...</p>
+        </div>
     </div>
 </div>
 
 <script>
-    // 1. Establish WebSocket Connection for real-time progress notifications
+    // 1. Establish WebSocket Connection
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const ws_path = ws_scheme + '://' + window.location.host + '/ws/notifications/';
     const socket = new WebSocket(ws_path);
@@ -329,48 +474,106 @@
         console.log("Received update:", e.data);
         const data = JSON.parse(e.data);
         
-        // Match progress status
         if (data.title && data.message && data.message.startsWith("STATUS:")) {
             progressContainer.style.display = 'block';
-            
-            // Format example: STATUS: PROCESSING. Extracting face embedding...
             const cleanMsg = data.message.replace(/STATUS:\s[A-Z]+\.\s/, "");
             progressTitle.innerText = data.title;
             progressMessage.innerText = cleanMsg;
 
             if (data.message.includes("STATUS: SUCCESS")) {
                 setTimeout(() => {
-                    // Refresh gallery grid to show the matched pictures!
                     location.reload();
                 }, 1500);
             }
         }
     };
 
-    // 2. Handle Selfie AJAX Upload
+    // 2. Handle Selfie AJAX Upload & Live Camera Capture
+    let localStream = null;
+    const btnCamera = document.getElementById('btn-camera');
+    const cameraFeed = document.getElementById('camera-feed');
+    const cameraCanvas = document.getElementById('camera-canvas');
+    const previewMedia = document.getElementById('preview-media');
     const selfieInput = document.getElementById('selfie-input');
+
+    btnCamera.addEventListener('click', function() {
+        if (localStream === null) {
+            // Request camera feed
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 400 }, height: { ideal: 400 } } })
+                .then(stream => {
+                    localStream = stream;
+                    cameraFeed.srcObject = stream;
+                    cameraFeed.style.display = 'block';
+                    previewMedia.style.display = 'none';
+                    btnCamera.innerText = 'Capture';
+                    btnCamera.style.background = 'rgba(16, 185, 129, 0.1)';
+                    btnCamera.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    btnCamera.style.color = '#34d399';
+                })
+                .catch(err => {
+                    console.error("Camera access failed:", err);
+                    alert("Could not access camera. Please check permissions or try uploading a file instead.");
+                });
+        } else {
+            // Draw feed to canvas
+            const width = cameraFeed.videoWidth || 400;
+            const height = cameraFeed.videoHeight || 400;
+            cameraCanvas.width = width;
+            cameraCanvas.height = height;
+            
+            const context = cameraCanvas.getContext('2d');
+            // Mirror image for natural user preview if using front-facing camera
+            context.translate(width, 0);
+            context.scale(-1, 1);
+            context.drawImage(cameraFeed, 0, 0, width, height);
+
+            // Stop local stream
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+            cameraFeed.style.display = 'none';
+            previewMedia.style.display = 'block';
+            
+            btnCamera.innerText = 'Live Selfie';
+            btnCamera.style.background = 'rgba(99, 102, 241, 0.1)';
+            btnCamera.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+            btnCamera.style.color = '#818cf8';
+
+            // Convert canvas output to blob
+            cameraCanvas.toBlob(function(blob) {
+                const imageUrl = URL.createObjectURL(blob);
+                previewMedia.innerHTML = `<img src="${imageUrl}" class="selfie-img">`;
+
+                // Upload direct via AJAX
+                const file = new File([blob], "live_selfie.jpg", { type: "image/jpeg" });
+                uploadSelfieFile(file);
+            }, 'image/jpeg', 0.9);
+        }
+    });
+
     selfieInput.addEventListener('change', function(e) {
         if (selfieInput.files.length === 0) return;
 
         const file = selfieInput.files[0];
+        
+        // Show local preview immediately
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewMedia.innerHTML = `<img src="${e.target.result}" class="selfie-img">`;
+        };
+        reader.readAsDataURL(file);
+
+        uploadSelfieFile(file);
+    });
+
+    function uploadSelfieFile(file) {
         const formData = new FormData();
         formData.append('selfie', file);
         formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-        // Show local preview immediately
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const preview = document.getElementById('selfie-preview');
-            preview.innerHTML = `<img src="${e.target.result}" class="selfie-img">`;
-        };
-        reader.readAsDataURL(file);
-
-        // Show progress box
         progressContainer.style.display = 'block';
         progressTitle.innerText = 'Uploading Selfie...';
         progressMessage.innerText = 'Sending your reference photo to the server.';
 
-        // POST upload
         fetch('{% url "upload_selfie" event.slug %}', {
             method: 'POST',
             body: formData
@@ -390,9 +593,147 @@
             progressTitle.innerText = 'Connection Error';
             progressMessage.innerText = 'Failed to communicate with face engine.';
         });
-    });
+    }
 
-    // 3. Lightbox Modal Functions
+    // 3. Multiselect Logic
+    const selectedPhotos = new Map(); // id -> url
+    const selectionBar = document.getElementById('selection-bar');
+    const selectedCountSpan = document.getElementById('selected-count');
+
+    function toggleSelectPhoto(id, url, element) {
+        if (selectedPhotos.has(id)) {
+            selectedPhotos.delete(id);
+            element.classList.remove('selected');
+        } else {
+            selectedPhotos.set(id, url);
+            element.classList.add('selected');
+        }
+
+        const count = selectedPhotos.size;
+        selectedCountSpan.innerText = count;
+
+        if (count > 0) {
+            selectionBar.classList.add('active');
+        } else {
+            selectionBar.classList.remove('active');
+        }
+    }
+
+    function clearSelection() {
+        selectedPhotos.clear();
+        document.querySelectorAll('.photo-card.selected').forEach(card => {
+            card.classList.remove('selected');
+        });
+        selectionBar.classList.remove('active');
+    }
+
+    // 4. Options Modal
+    const optionsModal = document.getElementById('options-modal');
+    const modalSelectedCount = document.getElementById('modal-selected-count');
+    const modalChoices = document.getElementById('modal-choices');
+    const optionsLoader = document.getElementById('options-loader');
+    const optionsLoaderText = document.getElementById('options-loader-text');
+
+    function openOptionsModal() {
+        modalSelectedCount.innerText = selectedPhotos.size;
+        modalChoices.style.display = 'flex';
+        optionsLoader.style.display = 'none';
+        optionsModal.style.display = 'flex';
+    }
+
+    function closeOptionsModal() {
+        optionsModal.style.display = 'none';
+    }
+
+    // 5. Download Selected Instantly (Web Quality ZIP via JSZip)
+    function downloadSelectedInstant() {
+        modalChoices.style.display = 'none';
+        optionsLoader.style.display = 'block';
+        optionsLoaderText.innerText = "Downloading and zipping your photos. Please wait...";
+
+        const zip = new JSZip();
+        const promises = [];
+
+        selectedPhotos.forEach((url, id) => {
+            const fileName = `photo_${id}.jpg`;
+            const promise = fetch(url)
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+                    return res.blob();
+                })
+                .then(blob => {
+                    zip.file(fileName, blob);
+                })
+                .catch(err => {
+                    console.error(`Failed to download photo ${id}:`, err);
+                });
+            promises.push(promise);
+        });
+
+        Promise.all(promises).then(() => {
+            optionsLoaderText.innerText = "Generating ZIP file...";
+            zip.generateAsync({ type: "blob" }).then(content => {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(content);
+                link.download = `wedding_photos_${Date.now()}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Success cleanup
+                closeOptionsModal();
+                clearSelection();
+            });
+        }).catch(err => {
+            console.error("ZIP download failed:", err);
+            optionsLoaderText.innerText = "Zipping failed. Please try again.";
+            setTimeout(() => {
+                closeOptionsModal();
+            }, 2000);
+        });
+    }
+
+    // 6. Request HD Quality (Celery + Email)
+    function requestSelectedHD() {
+        modalChoices.style.display = 'none';
+        optionsLoader.style.display = 'block';
+        optionsLoaderText.innerText = "Saving your HD request...";
+
+        const photoIds = Array.from(selectedPhotos.keys());
+        
+        fetch('{% url "request_hd_photo_bulk" event.slug %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ photo_ids: photoIds })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                optionsLoaderText.innerText = data.message;
+                setTimeout(() => {
+                    closeOptionsModal();
+                    clearSelection();
+                }, 4000);
+            } else {
+                optionsLoaderText.innerText = "Error: " + data.message;
+                setTimeout(() => {
+                    closeOptionsModal();
+                }, 2000);
+            }
+        })
+        .catch(err => {
+            console.error("HD request failed:", err);
+            optionsLoaderText.innerText = "Connection error. Please try again.";
+            setTimeout(() => {
+                closeOptionsModal();
+            }, 2000);
+        });
+    }
+
+    // 7. Lightbox Modal Functions
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightbox-img');
     const lightboxDownload = document.getElementById('lightbox-download');
@@ -412,6 +753,7 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeLightbox();
+            closeOptionsModal();
         }
     });
 </script>
