@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
@@ -226,7 +227,7 @@ def request_hd_photo_bulk(request, slug):
         requests_created = 0
         for photo in photos:
             # Save request as PENDING
-            HDRequest.objects.get_or_create(
+            HDRequest.objects.update_or_create(
                 event=event,
                 guest=request.user,
                 photo=photo,
@@ -236,7 +237,8 @@ def request_hd_photo_bulk(request, slug):
             
         if requests_created > 0:
             # Trigger celery background task to send the email!
-            send_hd_requests_email_task.delay(request.user.id, event.id)
+            base_url = request.build_absolute_uri('/')[:-1]
+            send_hd_requests_email_task.delay(request.user.id, event.id, base_url)
             
         return JsonResponse({
             'status': 'success',

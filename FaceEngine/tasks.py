@@ -202,15 +202,23 @@ def match_guest_selfie_task(user_id, event_id):
     return f"Completed matching for user {user_id} in event {event_id}. Found {matches_found} matches."
 
 @shared_task
-def send_hd_requests_email_task(user_id, event_id):
+def send_hd_requests_email_task(user_id, event_id, base_url=None):
     """
     Finds all PENDING HD requests for this user in this event,
-    and sends them an email listing the Google Drive links.
+    downloads the original high-res files from Google Drive,
+    compiles them in-memory into a ZIP archive, and emails it as an attachment or download link.
     """
-    from django.core.mail import send_mail
+    import io
+    import zipfile
+    from django.core.mail import EmailMessage
     from django.contrib.auth.models import User
+    from django.conf import settings
     from Events.models import Event
+    from Accounts.models import GoogleDriveCredential
     from .models import HDRequest
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
     
     try:
         user = User.objects.get(id=user_id)
@@ -221,32 +229,121 @@ def send_hd_requests_email_task(user_id, event_id):
         if not requests.exists():
             return "No pending HD requests found."
             
-        # Build the email body
-        email_body = f"Hello {user.username},\n\n"
-        email_body += f"Here are the download links for the high-resolution photos you requested from the event '{event.name}':\n\n"
-        
-        count = 1
-        for req in requests:
-            photo = req.photo
-            if photo.google_drive_file_id:
-                link = f"https://drive.google.com/uc?export=download&id={photo.google_drive_file_id}"
-                email_body += f"Photo {count}: {link}\n"
-                count += 1
+        # 1. Retrieve the photographer's Google Drive credentials
+        photographer_cred = GoogleDriveCredential.objects.filter(user=event.photographer).first()
+        if not photographer_cred:
+            logger.error(f"Photographer {event.photographer.username} Google Drive credential missing. Cannot process HD requests.")
+            return "Photographer Google Drive credentials missing."
+
+        creds = Credentials.from_authorized_user_info(photographer_cred.token)
+        service = build('drive', 'v3', credentials=creds)
+
+        # 2. Download files in memory and build ZIP archive
+        zip_buffer = io.BytesIO()
+        compiled_count = 0
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for req in requests:
+                photo = req.photo
+                if not photo.google_drive_file_id:
+                    continue
                 
-        email_body += "\nEnjoy your photos!\nBest regards,\nEventLens AI Delivery Team\n"
+                # Fetch file metadata to get name
+                try:
+                    file_info = service.files().get(fileId=photo.google_drive_file_id, fields='name').execute()
+                    file_name = file_info.get('name', f"photo_{photo.id}.jpg")
+                except Exception:
+                    file_name = f"photo_{photo.id}.jpg"
+                
+                # Download file contents
+                try:
+                    request_media = service.files().get_media(fileId=photo.google_drive_file_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request_media)
+                    done = False
+                    while done is False:
+                        _, done = downloader.next_chunk()
+                    
+                    # Write to ZIP
+                    zip_file.writestr(file_name, fh.getvalue())
+                    compiled_count += 1
+                except Exception as dl_err:
+                    logger.error(f"Error downloading HD file {photo.google_drive_file_id}: {str(dl_err)}")
+
+        # Check if ZIP has files
+        zip_buffer.seek(0)
+        zip_data = zip_buffer.getvalue()
+        if not zip_data or compiled_count == 0:
+            logger.error("No HD images successfully compiled into the ZIP.")
+            return "No images compiled into the ZIP."
+
+        # 3. Construct and send EmailMessage based on attachment size
+        subject = f"Your HD Photos from {event.name}"
+        zip_filename = f"{event.name.replace(' ', '_')}_HD_Photos.zip"
         
-        # Send Email
-        send_mail(
-            subject=f"Your HD Photos from {event.name}",
-            message=email_body,
-            from_email="no-reply@eventlens.local",
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        # 25GB threshold for email attachments
+        threshold = 25 * 1024 * 1024 * 1024
         
-        # Mark as SENT
+        if len(zip_data) < threshold:
+            body = (
+                f"Hello {user.username},\n\n"
+                f"Attached is the high-resolution ZIP archive containing the {compiled_count} HD wedding photos "
+                f"you requested from the event '{event.name}'.\n\n"
+                f"Enjoy your memories!\n\n"
+                f"Best regards,\n"
+                f"EventLens AI Delivery Team\n"
+            )
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@eventlens.local'),
+                to=[user.email]
+            )
+            email.attach(zip_filename, zip_data, 'application/zip')
+            email.send(fail_silently=False)
+        else:
+            import uuid
+            
+            # Make sure directory exists
+            downloads_dir = os.path.join(settings.MEDIA_ROOT, 'hd_downloads')
+            os.makedirs(downloads_dir, exist_ok=True)
+            
+            # Generate a secure unique filename
+            unique_id = uuid.uuid4().hex
+            safe_event_name = event.name.replace(' ', '_')
+            unique_filename = f"{safe_event_name}_{unique_id}.zip"
+            file_path = os.path.join(downloads_dir, unique_filename)
+            
+            # Write zip file
+            with open(file_path, 'wb') as f:
+                f.write(zip_data)
+                
+            # Construct download URL
+            if not base_url:
+                base_url = "http://localhost:8000" # Fallback
+            download_url = f"{base_url}{settings.MEDIA_URL}hd_downloads/{unique_filename}"
+            
+            body = (
+                f"Hello {user.username},\n\n"
+                f"The ZIP archive containing the {compiled_count} HD wedding photos you requested from the event '{event.name}' "
+                f"exceeded email attachment size limits.\n\n"
+                f"You can download your high-resolution photos using the following secure link:\n"
+                f"{download_url}\n\n"
+                f"Enjoy your memories!\n\n"
+                f"Best regards,\n"
+                f"EventLens AI Delivery Team\n"
+            )
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@eventlens.local'),
+                to=[user.email]
+            )
+            email.send(fail_silently=False)
+            
+        # Mark all as SENT
         requests.update(status='SENT')
-        return f"Successfully sent HD email containing {count-1} links to {user.email}."
+        return f"Successfully sent HD ZIP archive containing {compiled_count} photos to {user.email}."
         
     except Exception as e:
+        logger.error(f"Failed to execute send_hd_requests_email_task: {str(e)}")
         return f"Failed to send HD email: {str(e)}"
