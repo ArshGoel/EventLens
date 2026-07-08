@@ -1,9 +1,4 @@
-#!/bin/bash
-
-# Exit on error
-set -o errexit
-
-echo "==> Running Database Migrations..."
-python3 manage.py migrate --noinput
-
-echo "==> Build complete!"
+echo "BUILD START"
+docker-compose up --build
+docker-compose exec web python manage.py migrate
+echo "BUILD END"
