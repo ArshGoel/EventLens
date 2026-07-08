@@ -24,6 +24,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SQLITE_DB_PATH=/database/db.sqlite3
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
 
@@ -42,6 +43,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SQLITE_DB_PATH=/database/db.sqlite3
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
       - web

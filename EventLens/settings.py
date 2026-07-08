@@ -12,6 +12,8 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app,.railway.app,localh
 
 CSRF_TRUSTED_ORIGINS = [
     "https://eventlens-production.up.railway.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 INSTALLED_APPS = [
@@ -149,7 +151,7 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             "hosts": [{
-                "address": os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
+                "address": REDIS_URL,
                 "socket_timeout": None,
             }],
         },
