@@ -1,10 +1,23 @@
 {
-  "version": 2,
-  "cleanUrls": true,
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/$1"
-    }
-  ]
+    "builds": [{
+        "src": "Echoes_of_CSE_B/wsgi.py",
+        "use": "@vercel/python",
+        "config": { "runtime": "python3.13.0" }
+    },
+        {
+            "src": "build_files.sh",
+            "use": "@vercel/static-build",
+            "config": { "distDir": "staticfiles_build" }
+    
+    }],
+    "routes": [
+        {   
+            "src": "/static/(.*)",
+            "dest": "/static/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "Echoes_of_CSE_B/wsgi.py"
+        }
+    ]
 }
