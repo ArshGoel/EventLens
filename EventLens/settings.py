@@ -8,7 +8,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-hbm_(bpg0w*ssw
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app,.railway.app,localhost,127.0.0.1,*').split(',')
 
 INSTALLED_APPS = [
     'daphne',
