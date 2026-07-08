@@ -21,5 +21,13 @@ class Photo(models.Model):
             return self.image_url.replace('/upload/', '/upload/w_1200,c_limit,q_auto/')
         return self.image_url
 
+    @property
+    def download_url(self):
+        if self.image_url and 'res.cloudinary.com' in self.image_url:
+            # Add fl_attachment to force download from Cloudinary
+            return self.image_url.replace('/upload/', '/upload/fl_attachment/')
+        return self.image_url
+
     def __str__(self):
         return f"Photo {self.id} - {self.event.name}"
+

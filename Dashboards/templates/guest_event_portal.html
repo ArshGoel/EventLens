@@ -399,7 +399,10 @@
                         <img src="{{ photo.preview_url }}" alt="Matched Photo">
                         <div class="photo-overlay">
                             <span style="font-size: 0.85rem; font-weight: 600;">EventLens AI Match</span>
-                            <button class="btn-view-sm" onclick="event.stopPropagation(); openLightbox('{{ photo.preview_url }}')">View</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-view-sm" onclick="event.stopPropagation(); openLightbox('{{ photo.preview_url }}', '{{ photo.download_url }}')">View</button>
+                                <a class="btn-view-sm" href="{{ photo.download_url }}" download onclick="event.stopPropagation();" target="_blank" style="text-decoration: none;">Download</a>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}
@@ -738,9 +741,9 @@
     const lightboxImg = document.getElementById('lightbox-img');
     const lightboxDownload = document.getElementById('lightbox-download');
 
-    function openLightbox(url) {
+    function openLightbox(url, downloadUrl) {
         lightboxImg.src = url;
-        lightboxDownload.href = url;
+        lightboxDownload.href = downloadUrl || url;
         lightbox.style.display = 'flex';
     }
 
