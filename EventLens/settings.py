@@ -10,6 +10,10 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app,.railway.app,localhost,127.0.0.1,*').split(',')
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://eventlens-production.up.railway.app",
+]
+
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
