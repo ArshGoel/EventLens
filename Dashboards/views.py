@@ -130,9 +130,67 @@ def upload_photos(request, event_id):
         files.extend(request.FILES.getlist(key))
 
     if request.method == 'POST' and files:
+        import io
+        import uuid
+        from PIL import Image
+        from django.core.files.base import ContentFile
+        from django.conf import settings
+
         photo_ids = []
         for file in files:
-            photo = Photo.objects.create(event=event, image=file)
+            try:
+                # Read original bytes
+                original_bytes = file.read()
+                
+                # Compress & downscale image to 1200px at 80% quality in-memory
+                img_pil = Image.open(io.BytesIO(original_bytes))
+                if img_pil.mode in ("RGBA", "P"):
+                    img_pil = img_pil.convert("RGB")
+                img_pil.thumbnail((1200, 1200))
+                
+                out_io = io.BytesIO()
+                img_pil.save(out_io, format='JPEG', quality=80)
+                compressed_bytes = out_io.getvalue()
+            except Exception as compress_err:
+                # If compression fails, skip this file or handle it
+                continue
+
+            # Handle Cloudinary upload if configured
+            cloudinary_url = None
+            if settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY:
+                try:
+                    import cloudinary
+                    import cloudinary.uploader
+                    cloudinary.config(
+                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                        api_key=settings.CLOUDINARY_API_KEY,
+                        api_secret=settings.CLOUDINARY_API_SECRET,
+                        secure=True
+                    )
+                    
+                    file_uuid = uuid.uuid4().hex
+                    upload_res = cloudinary.uploader.upload(
+                        io.BytesIO(compressed_bytes),
+                        folder=f"eventlens/event_{event.id}",
+                        public_id=f"photo_{file_uuid}"
+                    )
+                    cloudinary_url = upload_res.get('secure_url')
+                except Exception as cloud_err:
+                    pass
+
+            photo = Photo(event=event)
+
+            if cloudinary_url:
+                photo.image_url = cloudinary_url
+                photo.save()
+            else:
+                # Fallback to local storage (only if Cloudinary is not configured or fails)
+                file_uuid = uuid.uuid4().hex
+                file_name = f"photo_{file_uuid}.jpg"
+                photo.image.save(file_name, ContentFile(compressed_bytes), save=False)
+                photo.image_url = photo.image.url
+                photo.save()
+
             # Queue face detection background job
             process_photo_faces_task.delay(photo.id)
             photo_ids.append(photo.id)
