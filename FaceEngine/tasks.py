@@ -246,45 +246,85 @@ def send_hd_requests_email_task(user_id, event_id, base_url=None):
         if not requests.exists():
             return "No pending HD requests found."
             
-        # 1. Retrieve the photographer's Google Drive credentials
-        photographer_cred = GoogleDriveCredential.objects.filter(user=event.photographer).first()
-        if not photographer_cred:
-            logger.error(f"Photographer {event.photographer.username} Google Drive credential missing. Cannot process HD requests.")
-            return "Photographer Google Drive credentials missing."
-
-        creds = Credentials.from_authorized_user_info(photographer_cred.token)
-        service = build('drive', 'v3', credentials=creds)
-
         # 2. Download files in memory and build ZIP archive
+        service = None
+        service_initialized = False
+
         zip_buffer = io.BytesIO()
         compiled_count = 0
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             for req in requests:
                 photo = req.photo
-                if not photo.google_drive_file_id:
-                    continue
-                
-                # Fetch file metadata to get name
-                try:
-                    file_info = service.files().get(fileId=photo.google_drive_file_id, fields='name').execute()
-                    file_name = file_info.get('name', f"photo_{photo.id}.jpg")
-                except Exception:
-                    file_name = f"photo_{photo.id}.jpg"
-                
-                # Download file contents
-                try:
-                    request_media = service.files().get_media(fileId=photo.google_drive_file_id)
-                    fh = io.BytesIO()
-                    downloader = MediaIoBaseDownload(fh, request_media)
-                    done = False
-                    while done is False:
-                        _, done = downloader.next_chunk()
-                    
-                    # Write to ZIP
-                    zip_file.writestr(file_name, fh.getvalue())
+                file_bytes = None
+                file_name = f"photo_{photo.id}.jpg"
+
+                # Case A: Local file on disk
+                if photo.image:
+                    try:
+                        if hasattr(photo.image, 'path') and os.path.exists(photo.image.path):
+                            with open(photo.image.path, 'rb') as f:
+                                file_bytes = f.read()
+                            file_name = os.path.basename(photo.image.name)
+                    except Exception as local_err:
+                        logger.error(f"Error reading local file for photo {photo.id}: {str(local_err)}")
+
+                # Case B: Remote URL (Cloudinary)
+                if not file_bytes and photo.image_url:
+                    try:
+                        import urllib.request
+                        resp = urllib.request.urlopen(photo.image_url)
+                        file_bytes = resp.read()
+                        
+                        # Extract file name from URL
+                        url_name = photo.image_url.split('/')[-1]
+                        if url_name and '.' in url_name:
+                            file_name = url_name
+                    except Exception as url_err:
+                        logger.error(f"Error downloading photo {photo.id} from remote URL: {str(url_err)}")
+
+                # Case C: Google Drive (Fallback)
+                if not file_bytes and photo.google_drive_file_id:
+                    if not service_initialized:
+                        photographer_cred = GoogleDriveCredential.objects.filter(user=event.photographer).first()
+                        if photographer_cred:
+                            try:
+                                creds = Credentials.from_authorized_user_info(photographer_cred.token)
+                                # Refresh token if expired
+                                if not creds.valid and creds.refresh_token:
+                                    from google.auth.transport.requests import Request
+                                    creds.refresh(Request())
+                                    photographer_cred.token['token'] = creds.token
+                                    photographer_cred.save()
+                                service = build('drive', 'v3', credentials=creds)
+                                service_initialized = True
+                            except Exception as init_err:
+                                logger.error(f"Failed to initialize Google Drive service: {str(init_err)}")
+                        else:
+                            logger.error(f"Google Drive credential missing for photographer {event.photographer.username}.")
+
+                    if service_initialized:
+                        try:
+                            # Fetch file metadata to get name
+                            try:
+                                file_info = service.files().get(fileId=photo.google_drive_file_id, fields='name').execute()
+                                file_name = file_info.get('name', f"photo_{photo.id}.jpg")
+                            except Exception:
+                                pass
+                            
+                            # Download file contents
+                            request_media = service.files().get_media(fileId=photo.google_drive_file_id)
+                            fh = io.BytesIO()
+                            downloader = MediaIoBaseDownload(fh, request_media)
+                            done = False
+                            while done is False:
+                                _, done = downloader.next_chunk()
+                            file_bytes = fh.getvalue()
+                        except Exception as gd_err:
+                            logger.error(f"Error downloading HD file {photo.google_drive_file_id} from Google Drive: {str(gd_err)}")
+
+                if file_bytes:
+                    zip_file.writestr(file_name, file_bytes)
                     compiled_count += 1
-                except Exception as dl_err:
-                    logger.error(f"Error downloading HD file {photo.google_drive_file_id}: {str(dl_err)}")
 
         # Check if ZIP has files
         zip_buffer.seek(0)
