@@ -118,8 +118,8 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# Run Celery tasks synchronously (inline) in serverless environments
-CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'True').lower() in ('true', '1', 'yes')
+# Run Celery tasks synchronously (inline) in serverless environments (like Vercel)
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'True' if os.environ.get('VERCEL') else 'False').lower() in ('true', '1', 'yes')
 
 # ASGI and Channels Configuration
 ASGI_APPLICATION = 'EventLens.asgi.application'
