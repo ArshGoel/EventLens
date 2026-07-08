@@ -60,7 +60,9 @@ def get_face_app():
 
         logger.info(f"InsightFace configured with Model: {model_name}, Ctx_ID: {ctx_id}, Det_Size: {det_size_val}")
         
-        _face_app = FaceAnalysis(name=model_name)
+        # Point to the pre-bundled model folder in the repo to prevent downloading in read-only Vercel environment
+        model_root = str(settings.BASE_DIR / '.insightface')
+        _face_app = FaceAnalysis(name=model_name, root=model_root)
         _face_app.prepare(ctx_id=ctx_id, det_size=(det_size_val, det_size_val))
     return _face_app
 

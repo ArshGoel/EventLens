@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-hbm_(bpg0w*sswnn2k-ajbzmr^ff5gu*+5!z4_%xv)3f*h&vg$'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-hbm_(bpg0w*sswnn2k-ajbzmr^ff5gu*+5!z4_%xv)3f*h&vg$')
 
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app,localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
     'daphne',
@@ -30,6 +31,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -68,6 +70,13 @@ DATABASES = {
     }
 }
 
+# Use PostgreSQL if DATABASE_URL environment variable is provided (Vercel/Production standard)
+if os.environ.get('DATABASE_URL'):
+    DATABASES['default'] = dj_database_url.config(
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -92,6 +101,9 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -105,6 +117,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+# Run Celery tasks synchronously (inline) in serverless environments
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'True').lower() in ('true', '1', 'yes')
 
 # ASGI and Channels Configuration
 ASGI_APPLICATION = 'EventLens.asgi.application'
@@ -149,6 +164,4 @@ INSIGHTFACE_MODEL_NAME = os.environ.get('INSIGHTFACE_MODEL_NAME', 'buffalo_l')
 FACE_ENGINE_CTX_ID = int(os.environ.get('FACE_ENGINE_CTX_ID', '-1'))
 FACE_DETECTION_SIZE = int(os.environ.get('FACE_DETECTION_SIZE', '480'))
 
-# Google API Key (for Picker)
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '') 
 
