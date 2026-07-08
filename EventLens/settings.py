@@ -118,12 +118,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Added Manually
 
 # Celery Configuration Options
-default_redis = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', default_redis)
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', default_redis)
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://127.0.0.1:6379/0"
+)
+
+CELERY_BROKER_URL = os.getenv(
+    "CELERY_BROKER_URL",
+    REDIS_URL
+)
+
+CELERY_RESULT_BACKEND = os.getenv(
+    "CELERY_RESULT_BACKEND",
+    REDIS_URL
+)
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
 # Run Celery tasks synchronously (inline) in serverless environments (like Vercel)
