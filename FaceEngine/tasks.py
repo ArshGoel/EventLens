@@ -146,7 +146,7 @@ def match_guest_selfie_task(user_id, event_id):
     except (User.DoesNotExist, UserProfile.DoesNotExist, Event.DoesNotExist) as e:
         return f"Failed to fetch models: {str(e)}"
 
-    if not profile.selfie:
+    if not profile.selfie and not profile.selfie_url:
         send_socket_status("ERROR", "No Selfie Uploaded", "Please upload a reference selfie first.")
         return "No selfie uploaded."
 
@@ -154,15 +154,30 @@ def match_guest_selfie_task(user_id, event_id):
 
     # Step 1: Compute selfie embedding if not already present
     if not profile.selfie_embedding:
-        selfie_path = profile.selfie.path
-        if not os.path.exists(selfie_path):
-            send_socket_status("ERROR", "File Not Found", "Selfie file does not exist on disk.")
-            return "Selfie file not found."
+        img = None
+        # Try loading from local path if exists
+        if profile.selfie:
+            try:
+                selfie_path = profile.selfie.path
+                if os.path.exists(selfie_path):
+                    img = cv2.imread(selfie_path)
+            except Exception:
+                pass
 
-        img = cv2.imread(selfie_path)
+        # Try loading from remote URL (Cloudinary)
+        if img is None and profile.selfie_url:
+            try:
+                import urllib.request
+                resp = urllib.request.urlopen(profile.selfie_url)
+                image_data = np.asarray(bytearray(resp.read()), dtype="uint8")
+                img = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+            except Exception as url_err:
+                send_socket_status("ERROR", "Download Failure", f"Failed to load remote selfie: {str(url_err)}")
+                return f"Failed to load remote selfie from URL {profile.selfie_url}: {str(url_err)}"
+
         if img is None:
-            send_socket_status("ERROR", "Read Failure", "Could not read the selfie image file.")
-            return "Failed to read selfie."
+            send_socket_status("ERROR", "File Not Found", "Selfie file could not be loaded from local path or URL.")
+            return "Selfie file not found."
 
         app = get_face_app()
         faces = app.get(img)

@@ -168,12 +168,13 @@ def guest_portal(request, slug):
     matched_photos = [match.photo for match in matches]
 
     # Check if they have uploaded a selfie
-    has_selfie = bool(profile.selfie)
+    has_selfie = bool(profile.selfie or profile.selfie_url)
+    selfie_url = profile.selfie_url if profile.selfie_url else (profile.selfie.url if profile.selfie else None)
 
     return render(request, 'guest_event_portal.html', {
         'event': event,
         'has_selfie': has_selfie,
-        'selfie_url': profile.selfie.url if has_selfie else None,
+        'selfie_url': selfie_url,
         'matched_photos': matched_photos,
     })
 
@@ -182,9 +183,80 @@ def guest_portal(request, slug):
 def upload_selfie(request, slug):
     event = get_object_or_death(Event, slug=slug)
     if request.method == 'POST' and request.FILES.get('selfie'):
+        import io
+        import uuid
+        from PIL import Image
+        from django.core.files.base import ContentFile
+        from django.conf import settings
+
+        selfie_file = request.FILES['selfie']
         profile = request.user.profile
-        profile.selfie = request.FILES['selfie']
+
+        try:
+            # Read original bytes
+            original_bytes = selfie_file.read()
+            
+            # Compress & downscale image to 1200px at 80% quality in-memory
+            img_pil = Image.open(io.BytesIO(original_bytes))
+            if img_pil.mode in ("RGBA", "P"):
+                img_pil = img_pil.convert("RGB")
+            img_pil.thumbnail((1200, 1200))
+            
+            out_io = io.BytesIO()
+            img_pil.save(out_io, format='JPEG', quality=80)
+            compressed_bytes = out_io.getvalue()
+        except Exception as compress_err:
+            return JsonResponse({'status': 'error', 'message': f'Failed to process image: {str(compress_err)}'}, status=400)
+
+        # Handle Cloudinary upload if configured
+        cloudinary_url = None
+        if settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY:
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                    api_key=settings.CLOUDINARY_API_KEY,
+                    api_secret=settings.CLOUDINARY_API_SECRET,
+                    secure=True
+                )
+                
+                # Delete old selfie from Cloudinary if it exists
+                if profile.selfie_url and 'res.cloudinary.com' in profile.selfie_url:
+                    try:
+                        old_public_id = profile.selfie_url.split('/upload/')[1].split('/', 1)[1].rsplit('.', 1)[0]
+                        cloudinary.uploader.destroy(old_public_id)
+                    except Exception:
+                        pass
+                
+                file_uuid = uuid.uuid4().hex
+                upload_res = cloudinary.uploader.upload(
+                    io.BytesIO(compressed_bytes),
+                    folder="eventlens/selfies",
+                    public_id=f"selfie_{request.user.id}_{file_uuid}"
+                )
+                cloudinary_url = upload_res.get('secure_url')
+            except Exception as cloud_err:
+                # If Cloudinary fails, log it and we'll fall back to local storage
+                pass
+
         profile.selfie_embedding = None # Reset old embedding so it gets re-calculated
+
+        if cloudinary_url:
+            profile.selfie_url = cloudinary_url
+            # Delete old local selfie file if it exists to save space
+            if profile.selfie:
+                try:
+                    profile.selfie.delete(save=False)
+                except Exception:
+                    pass
+            profile.selfie = None
+        else:
+            # Fallback to local storage (only if Cloudinary is not configured or fails)
+            file_name = f"selfie_{request.user.id}.jpg"
+            profile.selfie.save(file_name, ContentFile(compressed_bytes), save=False)
+            profile.selfie_url = None
+
         profile.save()
 
         # Delete old matches for this event to run a fresh scan

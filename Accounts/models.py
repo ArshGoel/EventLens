@@ -6,6 +6,7 @@ class UserProfile(models.Model):
     is_photographer = models.BooleanField(default=False)
     is_guest = models.BooleanField(default=True)
     selfie = models.ImageField(upload_to='selfies/', null=True, blank=True)
+    selfie_url = models.URLField(max_length=500, null=True, blank=True)
     selfie_embedding = models.JSONField(null=True, blank=True) # 512 float list
 
     def __str__(self):
