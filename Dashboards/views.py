@@ -155,41 +155,12 @@ def upload_photos(request, event_id):
                 # If compression fails, skip this file or handle it
                 continue
 
-            # Handle Cloudinary upload if configured
-            cloudinary_url = None
-            if settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY:
-                try:
-                    import cloudinary
-                    import cloudinary.uploader
-                    cloudinary.config(
-                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-                        api_key=settings.CLOUDINARY_API_KEY,
-                        api_secret=settings.CLOUDINARY_API_SECRET,
-                        secure=True
-                    )
-                    
-                    file_uuid = uuid.uuid4().hex
-                    upload_res = cloudinary.uploader.upload(
-                        io.BytesIO(compressed_bytes),
-                        folder=f"eventlens/event_{event.id}",
-                        public_id=f"photo_{file_uuid}"
-                    )
-                    cloudinary_url = upload_res.get('secure_url')
-                except Exception as cloud_err:
-                    pass
-
             photo = Photo(event=event)
-
-            if cloudinary_url:
-                photo.image_url = cloudinary_url
-                photo.save()
-            else:
-                # Fallback to local storage (only if Cloudinary is not configured or fails)
-                file_uuid = uuid.uuid4().hex
-                file_name = f"photo_{file_uuid}.jpg"
-                photo.image.save(file_name, ContentFile(compressed_bytes), save=False)
-                photo.image_url = photo.image.url
-                photo.save()
+            file_uuid = uuid.uuid4().hex
+            file_name = f"photo_{file_uuid}.jpg"
+            photo.image.save(file_name, ContentFile(compressed_bytes), save=False)
+            photo.image_url = photo.image.url
+            photo.save()
 
             # Queue face detection background job
             process_photo_faces_task.delay(photo.id)
