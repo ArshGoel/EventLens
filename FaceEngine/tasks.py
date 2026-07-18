@@ -102,22 +102,55 @@ def process_photo_faces_task(photo_id):
     faces = app.get(img)
 
     created_count = 0
+    new_faces = []
     for face in faces:
-        # Bounding box [x_min, y_min, x_max, y_max]
         bbox = face.bbox.tolist()
-        
-        # 512-D embedding
         embedding = face.normed_embedding.tolist()
 
-        # Save to DB
-        DetectedFace.objects.create(
+        det_face = DetectedFace.objects.create(
             photo=photo,
             bbox=bbox,
             embedding=embedding
         )
+        new_faces.append(det_face)
         created_count += 1
 
-    return f"Processed photo {photo_id}. Found and saved {created_count} faces."
+    # Automatically match new faces against existing guest selfies
+    try:
+        profiles = UserProfile.objects.exclude(selfie_embedding__isnull=True).exclude(selfie_embedding=[])
+        if new_faces and profiles.exists():
+            channel_layer = get_channel_layer()
+            for profile in profiles:
+                guest_embedding = np.array(profile.selfie_embedding)
+                matched_this_guest = False
+                
+                for face in new_faces:
+                    face_emb = np.array(face.embedding)
+                    similarity = float(np.dot(guest_embedding, face_emb))
+                    
+                    if similarity >= 0.48:
+                        match_obj, created = GuestMatch.objects.get_or_create(
+                            guest=profile.user,
+                            photo=photo,
+                            defaults={"similarity": similarity}
+                        )
+                        if created:
+                            matched_this_guest = True
+                
+                if matched_this_guest and channel_layer:
+                    group_name = f"user_{profile.user.id}"
+                    async_to_sync(channel_layer.group_send)(
+                        group_name,
+                        {
+                            "type": "send_notification",
+                            "title": "New Photo Match!",
+                            "message": f"STATUS: SUCCESS. A new photo matching your selfie has been uploaded! Refreshing your gallery..."
+                        }
+                    )
+    except Exception as match_err:
+        logger.error(f"Error matching new photo faces against existing selfies: {str(match_err)}")
+
+    return f"Processed photo {photo_id}. Found and saved {created_count} faces, checked existing guest matches."
 
 
 @shared_task
