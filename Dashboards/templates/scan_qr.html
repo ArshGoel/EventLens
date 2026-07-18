@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}EventLens | Scan Event QR Code{% endblock %}
+{% block title %}EventLens | Live QR Scanner{% endblock %}
 
 {% block extra_head %}
 <!-- HTML5 QR Code Scanner Library -->
@@ -9,245 +9,562 @@
 
 {% block content %}
 <style>
-    .scanner-container {
-        max-width: 650px;
-        margin: 0 auto;
-        padding: 40px 24px;
+    .scanner-page {
+        max-width: 550px;
+        margin: 40px auto;
+        padding: 0 16px;
+    }
+
+    .scanner-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 35px 25px;
+        box-shadow: var(--shadow-elegant);
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Glow effects behind the card */
+    .scanner-card::before {
+        content: '';
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+        top: -50px;
+        left: -50px;
+        pointer-events: none;
+    }
+
+    .scanner-header {
         text-align: center;
+        margin-bottom: 30px;
     }
 
     .scanner-title {
         font-size: 2.2rem;
-        margin-bottom: 10px;
-        background: var(--primary-glow);
+        font-weight: 800;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, hsl(40, 65%, 55%), hsl(40, 55%, 38%));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        letter-spacing: -0.02em;
     }
 
     .scanner-subtitle {
         color: var(--text-muted);
-        font-size: 1rem;
-        margin-bottom: 30px;
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 
-    #reader {
-        width: 100%;
-        border-radius: 16px;
-        overflow: hidden;
-        border: 1px solid var(--border-color);
-        background: rgba(0, 0, 0, 0.3);
-        margin: 0 auto 24px auto;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        position: relative;
-    }
-
-    /* Override default html5-qrcode styling to fit our theme */
-    #reader__dashboard {
-        padding: 15px !important;
-        background: rgba(15, 23, 42, 0.6) !important;
-        border-top: 1px solid var(--border-color);
-    }
-    
-    #reader__dashboard_section_csr button {
-        background: var(--primary-glow) !important;
-        color: white !important;
-        border: none !important;
-        padding: 10px 20px !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        cursor: pointer !important;
-        font-family: inherit !important;
-        font-size: 0.9rem !important;
-        margin: 5px !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-    }
-
-    #reader__dashboard_section_csr button:hover {
-        opacity: 0.9;
-    }
-
-    #reader__camera_selection {
-        background: #1e293b !important;
-        color: var(--text-main) !important;
-        border: 1px solid var(--border-color) !important;
-        padding: 8px 12px !important;
-        border-radius: 8px !important;
-        outline: none !important;
-        margin: 10px 5px !important;
-    }
-
-    .scanner-controls {
+    /* Mode Switcher Tabs */
+    .scanner-tabs {
         display: flex;
-        flex-direction: column;
-        gap: 15px;
-        margin-bottom: 24px;
-        align-items: center;
-    }
-
-    .file-input-wrapper {
-        position: relative;
-        display: inline-block;
-    }
-
-    .file-input-label {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(0, 0, 0, 0.05);
         border: 1px solid var(--border-color);
-        padding: 12px 24px;
-        border-radius: 12px;
-        color: var(--text-main);
-        cursor: pointer;
+        padding: 4px;
+        border-radius: 14px;
+        margin-bottom: 30px;
+        gap: 4px;
+    }
+
+    .tab-btn {
+        flex: 1;
+        background: transparent;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 10px;
+        color: var(--text-muted);
+        font-family: inherit;
         font-weight: 600;
-        transition: background-color 0.3s, border-color 0.3s;
-        display: inline-flex;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
     }
 
-    .file-input-label:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: #6366f1;
+    .tab-btn.active {
+        background: white;
+        color: hsl(var(--foreground));
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
 
-    #file-qr-input {
+    .scanner-panel {
+        display: none;
+        animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .scanner-panel.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Camera Viewport Wrapper */
+    .viewport-container {
+        position: relative;
+        width: 290px;
+        height: 290px;
+        margin: 0 auto 25px auto;
+        border-radius: 24px;
+        border: 2px solid var(--border-color);
+        background: rgba(0, 0, 0, 0.2);
+        box-shadow: inset 0 4px 20px rgba(0,0,0,0.15);
+        overflow: hidden;
+        transition: border-color 0.3s;
+    }
+
+    .viewport-container.scanning {
+        border-color: hsl(var(--gold));
+    }
+
+    #reader {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
+    }
+
+    #reader video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        border-radius: 20px;
+    }
+
+    /* Beautiful Laser Scan Line Animation */
+    .laser {
         position: absolute;
         left: 0;
-        top: 0;
-        opacity: 0;
         width: 100%;
-        height: 100%;
-        cursor: pointer;
-    }
-
-    .scan-status {
-        padding: 16px;
-        border-radius: 12px;
-        margin-top: 20px;
-        font-weight: 600;
+        height: 4px;
+        background: linear-gradient(90deg, transparent, hsl(var(--gold)), transparent);
+        box-shadow: 0 0 10px hsl(var(--gold)), 0 0 4px hsl(var(--gold));
+        animation: scanLaser 2.2s linear infinite;
+        z-index: 10;
+        pointer-events: none;
         display: none;
     }
 
-    .scan-status.success {
-        background: rgba(16, 185, 129, 0.15);
-        color: #34d399;
-        border: 1px solid rgba(16, 185, 129, 0.25);
+    .viewport-container.scanning .laser {
+        display: block;
     }
 
-    .scan-status.error {
-        background: rgba(239, 68, 68, 0.15);
-        color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.25);
+    @keyframes scanLaser {
+        0% { top: 0%; }
+        50% { top: 98%; }
+        100% { top: 0%; }
+    }
+
+    /* Viewfinder Corner Overlays */
+    .viewfinder-overlay {
+        position: absolute;
+        inset: 24px;
+        border: 2px solid transparent;
+        pointer-events: none;
+        z-index: 10;
+        transition: inset 0.3s;
+    }
+
+    .viewport-container.scanning .viewfinder-overlay {
+        inset: 32px;
+    }
+
+    .corner {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 4px solid hsl(var(--gold));
+        transition: border-color 0.3s;
+    }
+
+    .corner-tl { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 8px; }
+    .corner-tr { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 8px; }
+    .corner-bl { bottom: 0; left: 0; border-right: none; border-top: none; border-bottom-left-radius: 8px; }
+    .corner-br { bottom: 0; right: 0; border-left: none; border-top: none; border-bottom-right-radius: 8px; }
+
+    /* Custom Camera Selector Dropdown */
+    .camera-select-wrapper {
+        margin-top: 15px;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .camera-select-label {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+    }
+
+    #camera-select {
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        outline: none;
+        cursor: pointer;
+        width: 100%;
+        max-width: 290px;
+    }
+
+    /* File Drag & Drop / Upload Panel styling */
+    .upload-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 20px;
+        padding: 40px 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: rgba(255, 255, 255, 0.01);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        min-height: 290px;
+    }
+
+    .upload-zone:hover {
+        border-color: hsl(var(--gold));
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .upload-icon {
+        font-size: 3.5rem;
+        transition: transform 0.3s;
+    }
+
+    .upload-zone:hover .upload-icon {
+        transform: translateY(-5px);
+    }
+
+    .upload-btn {
+        background: rgba(0,0,0,0.02);
+        border: 1px solid var(--border-color);
+        padding: 8px 18px;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    /* Feedback message popup */
+    .status-alert {
+        padding: 16px 20px;
+        border-radius: 16px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        margin-top: 25px;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .status-alert.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .status-alert.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.2);
     }
 </style>
 
-<div class="scanner-container">
-    <div class="glass-card">
-        <h2 class="scanner-title">Scan Event QR Code</h2>
-        <p class="scanner-subtitle">Point your camera at a wedding QR code to access the gallery instantly</p>
+<div class="scanner-page">
+    <div class="scanner-card">
+        <div class="scanner-header">
+            <h2 class="scanner-title">Scan QR Code</h2>
+            <p class="scanner-subtitle">Access your personal wedding gallery instantly</p>
+        </div>
 
-        <!-- Camera scanning box -->
-        <div id="reader"></div>
+        <!-- Mode Select Tabs -->
+        <div class="scanner-tabs">
+            <button class="tab-btn active" id="tab-camera" onclick="switchMode('camera')">
+                📷 Use Camera
+            </button>
+            <button class="tab-btn" id="tab-upload" onclick="switchMode('upload')">
+                🖼️ Upload Image
+            </button>
+        </div>
 
-        <div class="scanner-controls">
-            <span style="color: var(--text-muted); font-size: 0.9rem;">— OR —</span>
-            
-            <div class="file-input-wrapper">
-                <label for="file-qr-input" class="file-input-label">
-                    <span>🖼️ Upload QR Image</span>
-                </label>
-                <input type="file" id="file-qr-input" accept="image/*">
+        <!-- Camera Scanner Panel -->
+        <div class="scanner-panel active" id="panel-camera">
+            <div class="viewport-container" id="viewport">
+                <!-- Glowing laser scanner line -->
+                <div class="laser"></div>
+                
+                <!-- Viewfinder grids -->
+                <div class="viewfinder-overlay">
+                    <div class="corner corner-tl"></div>
+                    <div class="corner corner-tr"></div>
+                    <div class="corner corner-bl"></div>
+                    <div class="corner corner-br"></div>
+                </div>
+                
+                <!-- Camera stream element -->
+                <div id="reader"></div>
+            </div>
+
+            <!-- Mobile Toggle Button -->
+            <div class="camera-toggle-wrapper" id="camera-toggle-container" style="display: none; justify-content: center; margin-top: 15px;">
+                <button onclick="toggleCameraFacing()" class="btn-sm" style="background: rgba(0, 0, 0, 0.05); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 600; padding: 10px 20px; display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; box-shadow: none;">
+                    🔄 Switch Camera Mode
+                </button>
+            </div>
+
+            <!-- Laptop Select Dropdown -->
+            <div class="camera-select-wrapper" id="camera-select-container" style="display: none; flex-direction: column; align-items: center; gap: 6px; margin-top: 15px;">
+                <span class="camera-select-label">Select Webcam</span>
+                <select id="camera-select"></select>
             </div>
         </div>
 
-        <div id="scan-feedback" class="scan-status"></div>
+        <!-- File Upload Scanner Panel -->
+        <div class="scanner-panel" id="panel-upload">
+            <div class="upload-zone" onclick="triggerFileSelect()">
+                <div class="upload-icon">📁</div>
+                <div style="text-align: center;">
+                    <p style="font-weight: 700; font-size: 1.05rem; margin-bottom: 4px;">Choose a photo</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">or drag and drop your QR code image here</p>
+                </div>
+                <button class="upload-btn">Browse Files</button>
+                <input type="file" id="file-qr-input" accept="image/*" style="display: none;">
+            </div>
+        </div>
+
+        <!-- Status Popup -->
+        <div id="scan-feedback" class="status-alert"></div>
     </div>
 </div>
 
 <script>
+    let html5QrCode = null;
+    let currentFacingMode = "environment"; // default to rear camera
+    let currentCameraId = null;
+    let isUsingFacingMode = true; // start using facingMode constraints
+    const config = { fps: 15, qrbox: { width: 200, height: 200 } };
+
+    // DOM Elements
+    const feedback = document.getElementById("scan-feedback");
+    const viewport = document.getElementById("viewport");
+    const cameraToggleContainer = document.getElementById("camera-toggle-container");
+    const cameraSelectContainer = document.getElementById("camera-select-container");
+    const cameraSelect = document.getElementById("camera-select");
+    const fileInput = document.getElementById('file-qr-input');
+
     document.addEventListener("DOMContentLoaded", function() {
-        const feedback = document.getElementById("scan-feedback");
-        let html5QrCode = null;
+        // Init camera scanner on load
+        initCameraScanner();
 
-        function showFeedback(message, type) {
-            feedback.textContent = message;
-            feedback.className = `scan-status ${type}`;
-            feedback.style.display = "block";
-        }
-
-        function onScanSuccess(decodedText, decodedResult) {
-            console.log(`Scan result: ${decodedText}`);
-            showFeedback("QR Code scanned successfully! Redirecting...", "success");
-            
-            // Stop scanning
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    window.location.href = decodedText;
-                }).catch(err => {
-                    console.error("Failed to stop scanner", err);
-                    window.location.href = decodedText;
-                });
-            } else {
-                window.location.href = decodedText;
-            }
-        }
-
-        function onScanFailure(error) {
-            // Quietly ignore scan failures during live feed (they happen every frame that has no QR code)
-        }
-
-        // Initialize Camera Scanner
-        html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-        // Start scanning with camera
-        Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length) {
-                // If camera devices exist, start scanning using the back/first camera
-                let cameraId = devices[0].id;
-                // Prefer back camera on mobile devices
-                const backCamera = devices.find(device => device.label.toLowerCase().includes('back'));
-                if (backCamera) {
-                    cameraId = backCamera.id;
-                }
-
-                html5QrCode.start(
-                    cameraId, 
-                    config, 
-                    onScanSuccess, 
-                    onScanFailure
-                ).catch(err => {
-                    console.error("Error starting camera scan", err);
-                    // Fall back to html5-qrcode's built-in file scan if camera fails
-                    showFeedback("Camera access error. You can still scan by uploading an image below.", "error");
-                });
-            } else {
-                showFeedback("No camera found. You can still scan by uploading an image below.", "error");
-            }
-        }).catch(err => {
-            console.error("Error listing cameras", err);
-            showFeedback("Camera initialization failed. Please try uploading an image instead.", "error");
+        // Handle drag & drop hover states
+        const uploadZone = document.querySelector('.upload-zone');
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = 'hsl(var(--gold))';
+                uploadZone.style.background = 'rgba(255, 255, 255, 0.04)';
+            }, false);
         });
 
-        // Handle QR Code Scanning via File Upload
-        const fileInput = document.getElementById('file-qr-input');
-        fileInput.addEventListener('change', e => {
-            if (e.target.files.length === 0) {
-                return;
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = '';
+                uploadZone.style.background = '';
+            }, false);
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect(files[0]);
             }
+        });
 
-            const imageFile = e.target.files[0];
-            const fileHtml5QrCode = new Html5Qrcode("reader");
-            
-            showFeedback("Processing image...", "success");
-
-            fileHtml5QrCode.scanFile(imageFile, true)
-                .then(decodedText => {
-                    onScanSuccess(decodedText, null);
-                })
-                .catch(err => {
-                    console.error("Error scanning file", err);
-                    showFeedback("Failed to detect a QR code in the image. Please try a clearer picture.", "error");
-                });
+        fileInput.addEventListener('change', e => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
         });
     });
+
+    function switchMode(mode) {
+        // Toggle tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.scanner-panel').forEach(panel => panel.classList.remove('active'));
+
+        document.getElementById(`tab-${mode}`).classList.add('active');
+        document.getElementById(`panel-${mode}`).classList.add('active');
+
+        // Hide feedback
+        feedback.style.display = "none";
+
+        // Stop/Start camera
+        if (mode === 'camera') {
+            startCamera();
+        } else {
+            stopCamera();
+        }
+    }
+
+    function showFeedback(message, type) {
+        feedback.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> <span>${message}</span>`;
+        feedback.className = `status-alert ${type}`;
+        feedback.style.display = "flex";
+    }
+
+    function onScanSuccess(decodedText) {
+        console.log(`Scan result: ${decodedText}`);
+        showFeedback("QR Code scanned successfully! Opening gallery...", "success");
+        viewport.classList.remove("scanning");
+        
+        // Stop scanning and redirect
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                window.location.href = decodedText;
+            }).catch(err => {
+                window.location.href = decodedText;
+            });
+        } else {
+            window.location.href = decodedText;
+        }
+    }
+
+    function initCameraScanner() {
+        html5QrCode = new Html5Qrcode("reader");
+        
+        // Populate camera select dropdown or toggle buttons if multiple cameras exist
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length > 1) {
+                if (window.innerWidth <= 768) {
+                    // Mobile: Show Switch Camera Mode button
+                    cameraToggleContainer.style.display = "flex";
+                } else {
+                    // Laptop/Desktop: Show dropdown select menu
+                    cameraSelectContainer.style.display = "flex";
+                    cameraSelect.innerHTML = "";
+                    devices.forEach(device => {
+                        const opt = document.createElement('option');
+                        opt.value = device.id;
+                        opt.textContent = device.label || `Webcam ${cameraSelect.length + 1}`;
+                        cameraSelect.appendChild(opt);
+                    });
+                    
+                    cameraSelect.onchange = () => {
+                        currentCameraId = cameraSelect.value;
+                        isUsingFacingMode = false;
+                        restartCamera();
+                    };
+                }
+            }
+        }).catch(err => console.log("Cams list check failed: ", err));
+
+        startCamera();
+    }
+
+    function startCamera() {
+        viewport.classList.add("scanning");
+        
+        // Target is either a facingMode constraint (mobile) or specific deviceId (laptop)
+        const cameraTarget = isUsingFacingMode ? { facingMode: currentFacingMode } : currentCameraId;
+
+        html5QrCode.start(
+            cameraTarget, 
+            config, 
+            onScanSuccess,
+            () => {} // Quietly ignore scanning loop failures
+        ).catch(err => {
+            console.error("Camera start failed, attempting ID-based fallback", err);
+            
+            // Fallback to first camera ID if constraints fail
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    isUsingFacingMode = false;
+                    currentCameraId = devices[0].id;
+                    html5QrCode.start(
+                        currentCameraId, 
+                        config, 
+                        onScanSuccess,
+                        () => {}
+                    ).catch(startErr => {
+                        console.error("Fallback start failed", startErr);
+                        viewport.classList.remove("scanning");
+                        showFeedback("Camera access blocked. Please upload an image instead.", "error");
+                    });
+                } else {
+                    viewport.classList.remove("scanning");
+                    showFeedback("No cameras found. Please upload your QR code image.", "error");
+                }
+            }).catch(camErr => {
+                console.error("Fallback getCameras failed", camErr);
+                viewport.classList.remove("scanning");
+                showFeedback("Camera access blocked. Please upload an image instead.", "error");
+            });
+        });
+    }
+
+    function stopCamera() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                viewport.classList.remove("scanning");
+            }).catch(err => console.error("Stop failed", err));
+        }
+    }
+
+    function restartCamera() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                startCamera();
+            }).catch(err => console.error(err));
+        } else {
+            startCamera();
+        }
+    }
+
+    function toggleCameraFacing() {
+        isUsingFacingMode = true;
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        restartCamera();
+    }
+
+    function triggerFileSelect() {
+        fileInput.click();
+    }
+
+    function handleFileSelect(file) {
+        if (!file) return;
+
+        showFeedback("Processing image...", "success");
+        const fileHtml5QrCode = new Html5Qrcode("reader");
+        
+        fileHtml5QrCode.scanFile(file, true)
+            .then(decodedText => {
+                onScanSuccess(decodedText);
+            })
+            .catch(err => {
+                console.error(err);
+                showFeedback("Could not find a valid QR code in the image. Please try a clearer picture.", "error");
+            });
+    }
 </script>
 {% endblock %}

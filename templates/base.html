@@ -121,6 +121,29 @@
             box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
         }
 
+        @media (max-width: 680px) {
+            .header-container {
+                flex-direction: column;
+                gap: 12px;
+                padding: 15px 12px;
+            }
+            .nav-links {
+                gap: 12px;
+                font-size: 0.85rem;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .nav-links a, .nav-links span {
+                font-size: 0.85rem;
+            }
+            .logo {
+                font-size: 1.4rem;
+            }
+            main {
+                padding: 20px 12px;
+            }
+        }
+
         main {
             flex: 1;
             max-width: 1200px;
@@ -207,7 +230,7 @@
         <div class="header-container">
             <a href="{% url 'home' %}" class="logo">EventLens</a>
             <nav class="nav-links">
-                <a href="{% url 'scan_qr' %}" style="display: flex; align-items: center; gap: 5px;">📷 Scan QR</a>
+                <a href="{% url 'scan_qr' %}" style="display: flex; align-items: center; gap: 5px;">Scan QR</a>
                 {% if user.is_authenticated %}
                     <span>Hello, <strong>{{ user.username }}</strong></span>
                     {% if user.profile.is_photographer %}

@@ -58,7 +58,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: space-between;
-        height: 280px;
+        height: 350px;
         text-align: center;
     }
 
@@ -108,7 +108,7 @@
         </div>
 
         <!-- Guest Card -->
-        <div class="glass-card option-card" style="height: 320px;">
+        <div class="glass-card option-card" style="height: 350px;">
             <div>
                 <div class="option-icon">✨</div>
                 <h2 class="option-title">For Guests</h2>
@@ -122,7 +122,7 @@
             {% else %}
                 <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
                     <a href="{% url 'register' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Sign Up</a>
-                    <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); box-shadow: none;">📷 Scan QR Code</a>
+                    {% comment %} <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); box-shadow: none;">📷 Scan QR Code</a> {% endcomment %}
                 </div>
             {% endif %}
         </div>
