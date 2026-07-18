@@ -62,8 +62,18 @@ def get_face_app():
         
         # Point to the pre-bundled model folder in the repo to prevent downloading in read-only Vercel environment
         model_root = str(settings.BASE_DIR / '.insightface')
-        _face_app = FaceAnalysis(name=model_name, root=model_root)
-        _face_app.prepare(ctx_id=ctx_id, det_size=(det_size_val, det_size_val))
+        try:
+            _face_app = FaceAnalysis(name=model_name, root=model_root)
+            _face_app.prepare(ctx_id=ctx_id, det_size=(det_size_val, det_size_val))
+        except Exception as load_err:
+            logger.warning(f"Error loading face analysis model, possibly corrupted: {str(load_err)}. Deleting corrupt model folder and retrying...")
+            import shutil
+            model_dir = os.path.join(model_root, 'models', model_name)
+            if os.path.exists(model_dir):
+                shutil.rmtree(model_dir)
+            # Retry loading (triggers a fresh clean download)
+            _face_app = FaceAnalysis(name=model_name, root=model_root)
+            _face_app.prepare(ctx_id=ctx_id, det_size=(det_size_val, det_size_val))
     return _face_app
 
 
