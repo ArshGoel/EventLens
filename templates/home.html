@@ -108,17 +108,22 @@
         </div>
 
         <!-- Guest Card -->
-        <div class="glass-card option-card">
+        <div class="glass-card option-card" style="height: 320px;">
             <div>
                 <div class="option-icon">✨</div>
                 <h2 class="option-title">For Guests</h2>
                 <p class="option-desc">Have you been invited to a wedding? Join, upload a selfie, and see all photos of you in real-time.</p>
             </div>
             {% if user.is_authenticated %}
-                <a href="{% url 'register' %}" class="btn-primary" style="width: 100%; display: none;">Guest Portal</a>
-                <span class="text-muted" style="font-size: 0.9rem;">Logged in as <strong>{{ user.username }}</strong>. Enter a wedding URL to find your photos!</span>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                    <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">📷 Scan Event QR Code</a>
+                    <span class="text-muted" style="font-size: 0.82rem; margin-top: 5px;">Logged in as <strong>{{ user.username }}</strong>. Scan or open your wedding URL to find your photos!</span>
+                </div>
             {% else %}
-                <a href="{% url 'register' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Sign Up</a>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                    <a href="{% url 'register' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Sign Up</a>
+                    <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); box-shadow: none;">📷 Scan QR Code</a>
+                </div>
             {% endif %}
         </div>
     </div>

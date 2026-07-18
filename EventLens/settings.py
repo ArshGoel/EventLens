@@ -186,4 +186,8 @@ INSIGHTFACE_MODEL_NAME = os.environ.get('INSIGHTFACE_MODEL_NAME', 'buffalo_l')
 FACE_ENGINE_CTX_ID = int(os.environ.get('FACE_ENGINE_CTX_ID', '-1'))
 FACE_DETECTION_SIZE = int(os.environ.get('FACE_DETECTION_SIZE', '480'))
 
+# Authentication Settings
+LOGIN_URL = 'login'
+
+
 

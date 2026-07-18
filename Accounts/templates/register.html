@@ -100,6 +100,9 @@
 
         <form method="POST">
             {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
@@ -127,7 +130,7 @@
         </form>
 
         <div class="auth-footer">
-            Already have an account? <a href="{% url 'login' %}">Sign in here</a>
+            Already have an account? <a href="{% url 'login' %}{% if next %}?next={{ next }}{% endif %}">Sign in here</a>
         </div>
     </div>
 </div>

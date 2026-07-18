@@ -9,6 +9,13 @@ class UserProfile(models.Model):
     selfie_url = models.URLField(max_length=500, null=True, blank=True)
     selfie_embedding = models.JSONField(null=True, blank=True) # 512 float list
 
+    # Photographer branding fields
+    business_name = models.CharField(max_length=255, null=True, blank=True)
+    logo = models.ImageField(upload_to='logos/', null=True, blank=True)
+    logo_url = models.URLField(max_length=500, null=True, blank=True)
+    whatsapp = models.CharField(max_length=20, null=True, blank=True)
+    instagram = models.CharField(max_length=100, null=True, blank=True)
+
     def __str__(self):
         return f"{self.user.username}'s Profile"
 

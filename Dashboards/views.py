@@ -33,6 +33,7 @@ def home(request):
 
 
 def register_view(request):
+    next_url = request.GET.get('next') or request.POST.get('next') or ''
     if request.method == 'POST':
         username = request.POST['username']
         email = request.POST['email']
@@ -41,7 +42,7 @@ def register_view(request):
 
         if User.objects.filter(username=username).exists():
             messages.error(request, "Username already exists.")
-            return render(request, 'register.html')
+            return render(request, 'register.html', {'next': next_url})
 
         user = User.objects.create_user(username=username, email=email, password=password)
         is_photographer = (role == 'photographer')
@@ -54,20 +55,25 @@ def register_view(request):
         )
 
         login(request, user)
+        if next_url:
+            return redirect(next_url)
         if is_photographer:
             return redirect('photographer_dashboard')
         return redirect('home')
 
-    return render(request, 'register.html')
+    return render(request, 'register.html', {'next': next_url})
 
 
 def login_view(request):
+    next_url = request.GET.get('next') or request.POST.get('next') or ''
     if request.method == 'POST':
         username = request.POST['username']
         ctx_pass = request.POST['password']
         user = authenticate(request, username=username, password=ctx_pass)
         if user is not None:
             login(request, user)
+            if next_url:
+                return redirect(next_url)
             try:
                 if user.profile.is_photographer:
                     return redirect('photographer_dashboard')
@@ -76,7 +82,7 @@ def login_view(request):
             return redirect('home')
         else:
             messages.error(request, "Invalid username or password.")
-    return render(request, 'login.html')
+    return render(request, 'login.html', {'next': next_url})
 
 
 def logout_view(request):
@@ -113,8 +119,97 @@ def photographer_dashboard(request):
     events = Event.objects.filter(photographer=request.user).order_by('-created_at')
     return render(request, 'photographer_dashboard.html', {
         'events': events,
-        'google_drive_connected': google_drive_connected
+        'google_drive_connected': google_drive_connected,
+        'profile': profile
     })
+
+
+@login_required
+def update_profile_view(request):
+    try:
+        profile = request.user.profile
+        if not profile.is_photographer:
+            return redirect('home')
+    except UserProfile.DoesNotExist:
+        return redirect('home')
+
+    if request.method == 'POST':
+        business_name = request.POST.get('business_name', '').strip()
+        whatsapp = request.POST.get('whatsapp', '').strip()
+        instagram = request.POST.get('instagram', '').strip()
+        logo_file = request.FILES.get('logo')
+
+        profile.business_name = business_name
+        profile.whatsapp = whatsapp
+        profile.instagram = instagram
+
+        if logo_file:
+            import io
+            import uuid
+            from PIL import Image
+            from django.core.files.base import ContentFile
+            from django.conf import settings
+
+            try:
+                original_bytes = logo_file.read()
+                img_pil = Image.open(io.BytesIO(original_bytes))
+                if img_pil.mode in ("RGBA", "P"):
+                    img_pil = img_pil.convert("RGBA")
+                img_pil.thumbnail((400, 400))
+                
+                out_io = io.BytesIO()
+                img_pil.save(out_io, format='PNG')
+                compressed_bytes = out_io.getvalue()
+            except Exception as compress_err:
+                messages.error(request, f"Failed to process logo: {str(compress_err)}")
+                return redirect('photographer_dashboard')
+
+            cloudinary_url = None
+            if settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY:
+                try:
+                    import cloudinary
+                    import cloudinary.uploader
+                    cloudinary.config(
+                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                        api_key=settings.CLOUDINARY_API_KEY,
+                        api_secret=settings.CLOUDINARY_API_SECRET,
+                        secure=True
+                    )
+                    
+                    if profile.logo_url and 'res.cloudinary.com' in profile.logo_url:
+                        try:
+                            old_public_id = profile.logo_url.split('/upload/')[1].split('/', 1)[1].rsplit('.', 1)[0]
+                            cloudinary.uploader.destroy(old_public_id)
+                        except Exception:
+                            pass
+                    
+                    file_uuid = uuid.uuid4().hex
+                    upload_res = cloudinary.uploader.upload(
+                        io.BytesIO(compressed_bytes),
+                        folder="eventlens/logos",
+                        public_id=f"logo_{request.user.id}_{file_uuid}"
+                    )
+                    cloudinary_url = upload_res.get('secure_url')
+                except Exception as cloud_err:
+                    pass
+
+            if cloudinary_url:
+                profile.logo_url = cloudinary_url
+                if profile.logo:
+                    try:
+                        profile.logo.delete(save=False)
+                    except Exception:
+                        pass
+                profile.logo = None
+            else:
+                file_name = f"logo_{request.user.id}.png"
+                profile.logo.save(file_name, ContentFile(compressed_bytes), save=False)
+                profile.logo_url = None
+
+        profile.save()
+        messages.success(request, "Branding and profile settings updated successfully!")
+        
+    return redirect('photographer_dashboard')
 
 
 
@@ -504,3 +599,11 @@ def delete_photo(request, photo_id):
         photo.delete()
         return JsonResponse({'status': 'success', 'message': 'Photo deleted successfully.'})
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+
+def scan_qr_view(request):
+    """
+    Renders the QR code scanner page for guests.
+    """
+    return render(request, 'scan_qr.html')
+

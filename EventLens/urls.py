@@ -33,6 +33,7 @@ urlpatterns = [
     path('register/', dash_views.register_view, name='register'),
     path('logout/', dash_views.logout_view, name='logout'),
     path('dashboard/photographer/', dash_views.photographer_dashboard, name='photographer_dashboard'),
+    path('dashboard/profile/update/', dash_views.update_profile_view, name='update_profile'),
     path('dashboard/upload/<int:event_id>/', dash_views.upload_photos, name='upload_photos'),
     path('dashboard/event/<int:event_id>/delete/', dash_views.delete_event, name='delete_event'),
     path('dashboard/event/<int:event_id>/edit/', dash_views.edit_event, name='edit_event'),
@@ -48,6 +49,7 @@ urlpatterns = [
     path('google-drive/disconnect/', gd_views.google_drive_disconnect, name='google_drive_disconnect'),
     path('google-drive/folders/', gd_views.google_drive_list_folders, name='google_drive_folders'),
     path('google-drive/import/', gd_views.google_drive_import_photos, name='google_drive_import'),
+    path('scan/', dash_views.scan_qr_view, name='scan_qr'),
 ]
 
 if settings.DEBUG:

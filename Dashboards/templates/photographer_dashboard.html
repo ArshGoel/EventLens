@@ -6,6 +6,8 @@
 <!-- Dropzone.js for Bulk Uploads -->
 <link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css" type="text/css" />
 <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+<!-- QRCode.js for QR Code Generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -244,6 +246,44 @@
                 </p>
             </div>
         </div>
+
+        <div class="glass-card">
+            <h2 class="form-title">Studio & Branding</h2>
+            <form action="{% url 'update_profile' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                {% if profile.logo_url or profile.logo %}
+                <div class="form-group" style="text-align: center; margin-bottom: 20px;">
+                    <label style="text-align: center; display: block; margin-bottom: 10px;">Current Logo</label>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; display: inline-block;">
+                        <img src="{% if profile.logo_url %}{{ profile.logo_url }}{% else %}{{ profile.logo.url }}{% endif %}" alt="Logo" style="max-height: 80px; max-width: 100%; object-fit: contain; border-radius: 8px;">
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="form-group">
+                    <label for="business_name">Studio / Business Name</label>
+                    <input type="text" id="business_name" name="business_name" value="{{ profile.business_name|default:'' }}" placeholder="e.g. Royal Wedding Captures">
+                </div>
+
+                <div class="form-group">
+                    <label for="whatsapp">WhatsApp Contact</label>
+                    <input type="text" id="whatsapp" name="whatsapp" value="{{ profile.whatsapp|default:'' }}" placeholder="e.g. +91 98765 43210">
+                </div>
+
+                <div class="form-group">
+                    <label for="instagram">Instagram Username</label>
+                    <input type="text" id="instagram" name="instagram" value="{{ profile.instagram|default:'' }}" placeholder="e.g. @royal_captures">
+                </div>
+
+                <div class="form-group">
+                    <label for="logo">Update Studio Logo</label>
+                    <input type="file" id="logo" name="logo" accept="image/*" style="padding: 10px 14px; background: rgba(255,255,255,0.01);">
+                </div>
+
+                <button type="submit" class="btn-primary" style="width: 100%;">Save Branding</button>
+            </form>
+        </div>
     </div>
 
     <!-- Right Column: Events List & Upload Manager -->
@@ -291,6 +331,9 @@
                             <a href="{% url 'guest_portal' event.slug %}" target="_blank" class="btn-sm" style="text-align: center; display: inline-block;">
                                 View Portal ↗
                             </a>
+                            <button onclick="showQRCode('{{ event.name|escapejs }}', '{% url 'guest_portal' event.slug %}')" class="btn-sm" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399 !important; box-shadow: none;">
+                                QR Code
+                            </button>
                         </div>
 
                         <!-- Dropzone Upload Area -->
@@ -743,6 +786,70 @@
             alert("Error communicating with server.");
         });
     }
+
+    // QR Code modal logic
+    function showQRCode(eventName, relativeUrl) {
+        const fullUrl = window.location.origin + relativeUrl;
+        document.getElementById('qr-event-name').textContent = eventName;
+        document.getElementById('qr-event-url').value = fullUrl;
+        
+        // Clear previous QR code
+        const qrContainer = document.getElementById('qrcode-container');
+        qrContainer.innerHTML = '';
+        
+        // Generate new QR code using qrcode.js
+        new QRCode(qrContainer, {
+            text: fullUrl,
+            width: 200,
+            height: 200,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+        
+        document.getElementById('qr-modal').style.display = 'flex';
+    }
+    
+    function closeQRModal() {
+        document.getElementById('qr-modal').style.display = 'none';
+    }
+    
+    function copyQRUrl() {
+        const urlInput = document.getElementById('qr-event-url');
+        urlInput.select();
+        urlInput.setSelectionRange(0, 99999); // For mobile devices
+        
+        navigator.clipboard.writeText(urlInput.value)
+            .then(() => {
+                alert("Gallery URL copied to clipboard!");
+            })
+            .catch(err => {
+                console.error("Failed to copy URL", err);
+            });
+    }
+    
+    function downloadQRCode() {
+        const img = document.querySelector('#qrcode-container img');
+        const canvas = document.querySelector('#qrcode-container canvas');
+        let dataUrl = '';
+        
+        if (img && img.src) {
+            dataUrl = img.src;
+        } else if (canvas) {
+            dataUrl = canvas.toDataURL("image/jpeg");
+        }
+        
+        if (dataUrl) {
+            const eventName = document.getElementById('qr-event-name').textContent || 'wedding';
+            const cleanName = eventName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const link = document.createElement('a');
+            link.download = `qrcode-${cleanName}.jpg`;
+            link.href = dataUrl;
+            link.click();
+        } else {
+            alert("Failed to download QR code. Try again.");
+        }
+    }
 </script>
 
 <!-- Edit Event Modal -->
@@ -773,6 +880,35 @@
         <div style="display: flex; gap: 15px; margin-top: 25px;">
             <button class="btn-primary" onclick="saveEventChanges()" style="flex: 1; height: 46px;">Save Changes</button>
             <button class="btn-secondary" onclick="closeEditModal()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); flex: 1; height: 46px;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div id="qr-modal" class="edit-modal" onclick="closeQRModal()">
+    <div class="glass-card edit-modal-content" onclick="event.stopPropagation()" style="text-align: center; max-width: 440px;">
+        <h3 style="font-size: 1.4rem; margin-bottom: 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; text-align: left;">
+            <span>Share Event QR Code</span>
+            <button onclick="closeQRModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </h3>
+        
+        <h4 id="qr-event-name" style="margin-bottom: 20px; font-size: 1.15rem; color: var(--text-main);"></h4>
+        
+        <!-- QR Code container -->
+        <div id="qrcode-container" style="background: white; padding: 20px; border-radius: 16px; display: inline-block; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);"></div>
+        
+        <!-- Action URL copy input -->
+        <div class="form-group" style="text-align: left; margin-bottom: 20px;">
+            <label style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 8px;">Gallery Link</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="qr-event-url" readonly style="flex: 1; height: 44px; padding: 0 12px; font-size: 0.88rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); color: var(--text-muted); outline: none;">
+                <button onclick="copyQRUrl()" class="btn-sm" style="height: 44px; padding: 0 16px; margin: 0; min-width: 70px;">Copy</button>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 15px;">
+            <button class="btn-primary" onclick="downloadQRCode()" style="flex: 1; height: 46px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">📥 Download QR</button>
+            <button class="btn-secondary" onclick="closeQRModal()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); flex: 1; height: 46px;">Cancel</button>
         </div>
     </div>
 </div>

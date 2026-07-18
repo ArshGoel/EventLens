@@ -375,6 +375,42 @@
             </div>
             <p class="progress-desc" id="progress-message">Scanning gallery for your face...</p>
         </div>
+
+        <!-- Photographer Branding Card -->
+        {% with photographer_profile=event.photographer.profile %}
+        {% if photographer_profile.business_name or photographer_profile.logo_url or photographer_profile.logo or photographer_profile.whatsapp or photographer_profile.instagram %}
+        <div class="glass-card" style="margin-top: 30px; text-align: center; padding: 24px; background: rgba(255,255,255,0.01); border-color: var(--border-color);">
+            <h3 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 15px; font-weight: 700;">Captured By</h3>
+            
+            {% if photographer_profile.logo_url or photographer_profile.logo %}
+            <div style="margin-bottom: 15px;">
+                <img src="{% if photographer_profile.logo_url %}{{ photographer_profile.logo_url }}{% else %}{{ photographer_profile.logo.url }}{% endif %}" alt="Photographer Logo" style="max-height: 55px; max-width: 100%; object-fit: contain; border-radius: 4px;">
+            </div>
+            {% endif %}
+            
+            <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+                {{ photographer_profile.business_name|default:event.photographer.username }}
+            </h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">Professional Wedding Photographer</p>
+            
+            {% if photographer_profile.whatsapp or photographer_profile.instagram %}
+            <div style="display: flex; justify-content: center; gap: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                {% if photographer_profile.whatsapp %}
+                <a href="https://wa.me/{{ photographer_profile.whatsapp|cut:' '|cut:'+' }}" target="_blank" style="display: flex; align-items: center; gap: 6px; color: #25d366; text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                    <span>💬 WhatsApp</span>
+                </a>
+                {% endif %}
+                
+                {% if photographer_profile.instagram %}
+                <a href="https://instagram.com/{{ photographer_profile.instagram|cut:'@' }}" target="_blank" style="display: flex; align-items: center; gap: 6px; color: #e1306c; text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                    <span>📸 Instagram</span>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endwith %}
     </div>
 
     <!-- Right Column: Photos Grid -->
