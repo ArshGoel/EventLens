@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | Guest Verification{% endblock %}
+
+{% block content %}
+<style>
+    .guest-auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 70vh;
+        padding: 30px 15px;
+    }
+
+    .guest-auth-card {
+        max-width: 440px;
+        width: 100%;
+        padding: 36px 30px;
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .guest-icon {
+        font-size: 3rem;
+        text-align: center;
+        margin-bottom: 12px;
+    }
+
+    .guest-title {
+        font-size: 1.9rem;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
+    }
+
+    .guest-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        text-align: center;
+        margin-bottom: 28px;
+        line-height: 1.4;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+    }
+
+    input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border-color);
+        padding: 14px 18px;
+        border-radius: 14px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s ease, background-color 0.3s ease;
+    }
+
+    input:focus {
+        border-color: #6366f1;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .otp-code-input {
+        letter-spacing: 0.3em;
+        text-align: center;
+        font-size: 1.4rem;
+        font-weight: 700;
+    }
+
+    .alert-box {
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        margin-bottom: 20px;
+        display: none;
+        line-height: 1.4;
+    }
+
+    .alert-box.success {
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #34d399;
+    }
+
+    .alert-box.error {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #f87171;
+    }
+
+    .alert-box.info {
+        background: rgba(99, 102, 241, 0.12);
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        color: #818cf8;
+    }
+</style>
+
+<div class="guest-auth-container">
+    <div class="glass-card guest-auth-card">
+        <div class="guest-icon">✨</div>
+        <h2 class="guest-title">Guest Verification</h2>
+        <p class="guest-subtitle">Enter your email address to receive a 6-digit access code and view your wedding photos.</p>
+
+        <!-- Alert Notification Box -->
+        <div id="statusAlert" class="alert-box"></div>
+
+        <!-- STEP 1: Email Form -->
+        <form id="otpSendForm" onsubmit="handleSendOTP(event)">
+            {% csrf_token %}
+            <input type="hidden" id="guestNextUrl" value="{{ next }}">
+            
+            <div class="form-group">
+                <label for="emailAddress">Your Email Address</label>
+                <input type="email" id="emailAddress" placeholder="guest@example.com" required autocomplete="email">
+            </div>
+
+            <button type="submit" id="btnSendOTP" class="btn-primary" style="width: 100%;">
+                Send Verification Code 📧
+            </button>
+        </form>
+
+        <!-- STEP 2: Verification Code Entry Form (Initially Hidden) -->
+        <form id="otpVerifyForm" onsubmit="handleVerifyOTP(event)" style="display: none; margin-top: 10px;">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="otpCode">6-Digit Verification Code</label>
+                <input type="text" id="otpCode" class="otp-code-input" maxlength="6" placeholder="000000" required autocomplete="one-time-code">
+            </div>
+
+            <button type="submit" id="btnVerifyOTP" class="btn-primary" style="width: 100%;">
+                Verify & Access Event Gallery 🚀
+            </button>
+
+            <div style="text-align: center; margin-top: 16px;">
+                <button type="button" onclick="resetOTPForm()" style="background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; text-decoration: underline;">
+                    Change Email Address or Resend
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showAlert(message, type = 'info') {
+    const alertBox = document.getElementById('statusAlert');
+    alertBox.className = 'alert-box ' + type;
+    alertBox.innerHTML = message;
+    alertBox.style.display = 'block';
+}
+
+function hideAlert() {
+    const alertBox = document.getElementById('statusAlert');
+    alertBox.style.display = 'none';
+}
+
+function getCsrfToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+async function handleSendOTP(event) {
+    event.preventDefault();
+    hideAlert();
+
+    const email = document.getElementById('emailAddress').value.trim();
+    const btn = document.getElementById('btnSendOTP');
+
+    if (!email) {
+        showAlert('Please enter a valid email address.', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Sending Code... ⏳';
+
+    try {
+        const response = await fetch("{% url 'send_guest_otp' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ email: email })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && (data.status === 'success' || data.status === 'warning')) {
+            document.getElementById('otpSendForm').style.display = 'none';
+            document.getElementById('otpVerifyForm').style.display = 'block';
+            document.getElementById('otpCode').focus();
+
+            let msg = data.message || 'OTP verification code sent to your email!';
+            if (data.dev_otp && data.status === 'warning') {
+                msg += `<br><strong>[DEV CODE]:</strong> <span style="letter-spacing: 0.1em; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${data.dev_otp}</span>`;
+            }
+            showAlert(msg, 'success');
+        } else {
+            showAlert(data.message || 'Failed to send verification code. Please check your email.', 'error');
+        }
+    } catch (err) {
+        showAlert('Network error sending verification code. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send Verification Code 📧';
+    }
+}
+
+async function handleVerifyOTP(event) {
+    event.preventDefault();
+    hideAlert();
+
+    const email = document.getElementById('emailAddress').value.trim();
+    const otp = document.getElementById('otpCode').value.trim();
+    const nextUrl = document.getElementById('guestNextUrl').value;
+    const btn = document.getElementById('btnVerifyOTP');
+
+    if (!otp || otp.length < 4) {
+        showAlert('Please enter the 6-digit code sent to your email.', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Verifying... ⏳';
+
+    try {
+        const response = await fetch("{% url 'verify_guest_otp' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                email: email,
+                otp: otp,
+                next: nextUrl
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            showAlert('Verified successfully! Accessing gallery...', 'success');
+            setTimeout(() => {
+                window.location.href = data.redirect_url || '/';
+            }, 500);
+        } else {
+            showAlert(data.message || 'Invalid verification code.', 'error');
+        }
+    } catch (err) {
+        showAlert('Network error verifying code. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Verify & Access Event Gallery 🚀';
+    }
+}
+
+function resetOTPForm() {
+    hideAlert();
+    document.getElementById('otpSendForm').style.display = 'block';
+    document.getElementById('otpVerifyForm').style.display = 'none';
+    document.getElementById('otpCode').value = '';
+    document.getElementById('emailAddress').focus();
+}
+</script>
+{% endblock %}

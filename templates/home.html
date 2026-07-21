@@ -103,7 +103,9 @@
             {% if user.is_authenticated and user.profile.is_photographer %}
                 <a href="{% url 'photographer_dashboard' %}" class="btn-primary" style="width: 100%;">Go to Dashboard</a>
             {% else %}
-                <a href="{% url 'register' %}?role=photographer" class="btn-primary" style="width: 100%;">Photographer Sign Up</a>
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                    <a href="{% url 'photographer_login' %}" class="btn-primary" style="width: 100%;">Photographer Sign In 📷</a>
+                </div>
             {% endif %}
         </div>
 
@@ -121,7 +123,7 @@
                 </div>
             {% else %}
                 <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                    <a href="{% url 'login' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Email Login 📧</a>
+                    <a href="{% url 'guest_login' %}" class="btn-primary" style="width: 100%;">Guest Email Login 📧</a>
                 </div>
             {% endif %}
         </div>

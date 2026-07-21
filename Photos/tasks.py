@@ -106,6 +106,13 @@ def import_photos_from_drive_task(user_id, event_id, folder_id):
                     img_pil = img_pil.convert("RGB")
                 img_pil.thumbnail((1200, 1200))
                 
+                # Apply 1:1 photographer branding logo watermark at bottom-right corner
+                try:
+                    from Photos.watermark_utils import apply_branding_logo
+                    img_pil = apply_branding_logo(img_pil, event.photographer.profile)
+                except Exception as w_err:
+                    logger.warning(f"Failed applying watermark during drive import: {str(w_err)}")
+
                 out_io = io.BytesIO()
                 img_pil.save(out_io, format='JPEG', quality=80)
                 compressed_bytes = out_io.getvalue()

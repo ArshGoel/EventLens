@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}EventLens | Photographer Portal Sign In{% endblock %}
+
+{% block content %}
+<style>
+    .photographer-auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 70vh;
+        padding: 30px 15px;
+    }
+
+    .photographer-auth-card {
+        max-width: 440px;
+        width: 100%;
+        padding: 36px 30px;
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .photographer-icon {
+        font-size: 3rem;
+        text-align: center;
+        margin-bottom: 12px;
+    }
+
+    .photographer-title {
+        font-size: 1.9rem;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
+    }
+
+    .photographer-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        text-align: center;
+        margin-bottom: 28px;
+        line-height: 1.4;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+    }
+
+    input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border-color);
+        padding: 14px 18px;
+        border-radius: 14px;
+        color: var(--text-main);
+        font-family: inherit;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s ease, background-color 0.3s ease;
+    }
+
+    input:focus {
+        border-color: #6366f1;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 0.88rem;
+        color: var(--text-muted);
+    }
+
+    .auth-footer a {
+        color: #818cf8;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="photographer-auth-container">
+    <div class="glass-card photographer-auth-card">
+        <div class="photographer-icon">📷</div>
+        <h2 class="photographer-title">Photographer Portal</h2>
+        <p class="photographer-subtitle">Sign in to manage your wedding events, galleries, and AI face recognition.</p>
+
+        <form method="POST">
+            {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username" placeholder="Enter username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 8px;">
+                Sign In to Dashboard 📷
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Don't have a photographer account? <a href="{% url 'register' %}?role=photographer{% if next %}&next={{ next }}{% endif %}">Create Account</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

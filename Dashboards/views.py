@@ -131,7 +131,7 @@ def register_view(request):
     role = request.GET.get('role', 'guest')
     next_url = request.GET.get('next') or request.POST.get('next') or ''
     if role == 'guest':
-        return redirect(f"/login/?role=guest&next={next_url}" if next_url else "/login/?role=guest")
+        return redirect(f"/guest-login/?next={next_url}" if next_url else "/guest-login/")
 
     if request.method == 'POST':
         username = request.POST['username']
@@ -162,13 +162,36 @@ def register_view(request):
     return render(request, 'register.html', {'next': next_url})
 
 
-def login_view(request):
+def guest_login_view(request):
+    """
+    Dedicated, clean login page for guests (Email OTP only).
+    """
     next_url = request.GET.get('next') or request.POST.get('next') or ''
-    role = request.GET.get('role', '')
+    if request.user.is_authenticated:
+        if next_url and next_url.startswith('/'):
+            return redirect(next_url)
+        return redirect('home')
+    return render(request, 'guest_login.html', {'next': next_url})
+
+
+def photographer_login_view(request):
+    """
+    Dedicated portal for photographers (Username & Password login).
+    """
+    next_url = request.GET.get('next') or request.POST.get('next') or ''
+    if request.user.is_authenticated:
+        try:
+            if request.user.profile.is_photographer:
+                return redirect('photographer_dashboard')
+        except UserProfile.DoesNotExist:
+            pass
+        if next_url and next_url.startswith('/'):
+            return redirect(next_url)
+        return redirect('home')
 
     if request.method == 'POST':
-        username = request.POST.get('username')
-        ctx_pass = request.POST.get('password')
+        username = request.POST.get('username', '').strip()
+        ctx_pass = request.POST.get('password', '').strip()
         if username and ctx_pass:
             user = authenticate(request, username=username, password=ctx_pass)
             if user is not None:
@@ -183,9 +206,23 @@ def login_view(request):
                 return redirect('home')
             else:
                 messages.error(request, "Invalid username or password.")
+        else:
+            messages.error(request, "Please enter both username and password.")
 
-    active_tab = 'guest' if (role == 'guest' or '/event/' in next_url or not role) else 'photographer'
-    return render(request, 'login.html', {'next': next_url, 'active_tab': active_tab})
+    return render(request, 'photographer_login.html', {'next': next_url})
+
+
+def login_view(request):
+    """
+    General login dispatcher routing guests to guest_login and photographers to photographer_login.
+    """
+    next_url = request.GET.get('next') or ''
+    role = request.GET.get('role', '')
+
+    if role == 'photographer':
+        return redirect(f"/photographer-login/?next={next_url}" if next_url else "/photographer-login/")
+    return redirect(f"/guest-login/?next={next_url}" if next_url else "/guest-login/")
+
 
 
 def logout_view(request):
@@ -311,6 +348,17 @@ def update_profile_view(request):
                 profile.logo_url = None
 
         profile.save()
+
+        if logo_file:
+            try:
+                from Photos.models import Photo
+                from Photos.watermark_utils import reprocess_photo_watermark
+                user_photos = Photo.objects.filter(event__photographer=request.user)
+                for p in user_photos:
+                    reprocess_photo_watermark(p)
+            except Exception:
+                pass
+
         messages.success(request, "Branding and profile settings updated successfully!")
         
     return redirect('photographer_dashboard')
@@ -347,6 +395,13 @@ def upload_photos(request, event_id):
                     img_pil = img_pil.convert("RGB")
                 img_pil.thumbnail((1200, 1200))
                 
+                # Apply 1:1 photographer branding logo watermark at bottom-right corner
+                try:
+                    from Photos.watermark_utils import apply_branding_logo
+                    img_pil = apply_branding_logo(img_pil, event.photographer.profile)
+                except Exception:
+                    pass
+
                 out_io = io.BytesIO()
                 img_pil.save(out_io, format='JPEG', quality=80)
                 compressed_bytes = out_io.getvalue()

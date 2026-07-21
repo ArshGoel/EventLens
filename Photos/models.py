@@ -10,23 +10,25 @@ class Photo(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        if self.image and not self.image_url:
-            self.image_url = self.image.url
-            super().save(update_fields=['image_url'])
+        if self.image and hasattr(self.image, 'url'):
+            # Keep image_url synchronized if not pointing to Cloudinary
+            if not self.image_url or (not 'res.cloudinary.com' in str(self.image_url) and self.image_url != self.image.url):
+                self.image_url = self.image.url
+                super().save(update_fields=['image_url'])
 
     @property
     def preview_url(self):
-        if self.image_url and 'res.cloudinary.com' in self.image_url:
-            # Dynamically request downscaled and auto-compressed preview from Cloudinary
-            return self.image_url.replace('/upload/', '/upload/w_1200,c_limit,q_auto/')
-        return self.image_url
+        url = self.image_url or (self.image.url if self.image else '')
+        if url and 'res.cloudinary.com' in url:
+            return url.replace('/upload/', '/upload/w_1200,c_limit,q_auto/')
+        return url
 
     @property
     def download_url(self):
-        if self.image_url and 'res.cloudinary.com' in self.image_url:
-            # Add fl_attachment to force download from Cloudinary
-            return self.image_url.replace('/upload/', '/upload/fl_attachment/')
-        return self.image_url
+        url = self.image_url or (self.image.url if self.image else '')
+        if url and 'res.cloudinary.com' in url:
+            return url.replace('/upload/', '/upload/fl_attachment/')
+        return url
 
     def __str__(self):
         return f"Photo {self.id} - {self.event.name}"
