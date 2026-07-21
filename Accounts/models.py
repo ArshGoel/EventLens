@@ -5,6 +5,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     is_photographer = models.BooleanField(default=False)
     is_guest = models.BooleanField(default=True)
+    phone_number = models.CharField(max_length=25, null=True, blank=True, db_index=True)
     selfie = models.ImageField(upload_to='selfies/', null=True, blank=True)
     selfie_url = models.URLField(max_length=500, null=True, blank=True)
     selfie_embedding = models.JSONField(null=True, blank=True) # 512 float list

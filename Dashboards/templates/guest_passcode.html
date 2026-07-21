@@ -60,6 +60,20 @@
 
 <div class="passcode-container">
     <div class="glass-card passcode-card">
+        <!-- Photographer Branding Info -->
+        {% with photographer_profile=event.photographer.profile %}
+        {% if photographer_profile.business_name or photographer_profile.logo_url or photographer_profile.logo %}
+        <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            {% if photographer_profile.logo_url or photographer_profile.logo %}
+            <img src="{% if photographer_profile.logo_url %}{{ photographer_profile.logo_url }}{% else %}{{ photographer_profile.logo.url }}{% endif %}" alt="Logo" style="max-height: 45px; max-width: 100%; object-fit: contain;">
+            {% endif %}
+            <span style="font-size: 0.85rem; color: var(--text-muted);">
+                Gallery captured & hosted by <strong style="color: var(--text-main);">{{ photographer_profile.business_name|default:event.photographer.username }}</strong>
+            </span>
+        </div>
+        {% endif %}
+        {% endwith %}
+
         <div class="lock-icon">🔒</div>
         <h2 class="title">{{ event.name }}</h2>
         <p class="desc">This wedding gallery is passcode protected. Please enter the passcode provided by the couple or photographer to view your photos.</p>
@@ -72,20 +86,6 @@
 
             <button type="submit" class="btn-primary" style="width: 100%;">Access Gallery</button>
         </form>
-
-        <!-- Photographer Branding Info -->
-        {% with photographer_profile=event.photographer.profile %}
-        {% if photographer_profile.business_name or photographer_profile.logo_url or photographer_profile.logo %}
-        <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-            {% if photographer_profile.logo_url or photographer_profile.logo %}
-            <img src="{% if photographer_profile.logo_url %}{{ photographer_profile.logo_url }}{% else %}{{ photographer_profile.logo.url }}{% endif %}" alt="Logo" style="max-height: 40px; max-width: 100%; object-fit: contain; opacity: 0.8;">
-            {% endif %}
-            <span style="font-size: 0.8rem; color: var(--text-muted);">
-                Gallery captured & hosted by <strong>{{ photographer_profile.business_name|default:event.photographer.username }}</strong>
-            </span>
-        </div>
-        {% endif %}
-        {% endwith %}
     </div>
 </div>
 {% endblock %}

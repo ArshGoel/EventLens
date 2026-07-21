@@ -30,6 +30,8 @@ urlpatterns = [
     # Platform routes
     path('', dash_views.home, name='home'),
     path('login/', dash_views.login_view, name='login'),
+    path('send-otp/', dash_views.send_guest_otp, name='send_guest_otp'),
+    path('verify-otp/', dash_views.verify_guest_otp, name='verify_guest_otp'),
     path('register/', dash_views.register_view, name='register'),
     path('logout/', dash_views.logout_view, name='logout'),
     path('dashboard/photographer/', dash_views.photographer_dashboard, name='photographer_dashboard'),

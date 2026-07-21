@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}EventLens | Login{% endblock %}
+{% block title %}EventLens | Sign In{% endblock %}
 
 {% block content %}
 <style>
@@ -8,46 +8,97 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 60vh;
+        min-height: 65vh;
+        padding: 20px 0;
     }
 
     .auth-card {
-        max-width: 450px;
+        max-width: 460px;
         width: 100%;
+        padding: 32px;
+        border-radius: 20px;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 24px;
     }
 
     .auth-title {
         font-size: 2rem;
-        margin-bottom: 8px;
-        text-align: center;
+        font-weight: 700;
+        margin-bottom: 6px;
+        letter-spacing: -0.02em;
     }
 
     .auth-subtitle {
         color: var(--text-muted);
         font-size: 0.95rem;
-        margin-bottom: 30px;
+    }
+
+    /* Tab Switcher */
+    .tab-switcher {
+        display: flex;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        padding: 4px;
+        border-radius: 14px;
+        margin-bottom: 26px;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 10px 14px;
         text-align: center;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.9rem;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+    }
+
+    .tab-btn.active {
+        background: var(--primary-color, #6366f1);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     .form-group {
-        margin-bottom: 20px;
+        margin-bottom: 18px;
     }
 
     label {
         display: block;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         color: var(--text-muted);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         font-weight: 600;
     }
 
     input {
         width: 100%;
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.04);
         border: 1px solid var(--border-color);
-        padding: 14px 18px;
+        padding: 14px 16px;
         border-radius: 12px;
         color: var(--text-main);
         font-family: inherit;
@@ -58,13 +109,47 @@
 
     input:focus {
         border-color: #6366f1;
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .otp-code-input {
+        letter-spacing: 0.3em;
+        text-align: center;
+        font-size: 1.3rem;
+        font-weight: 700;
+    }
+
+    .alert-box {
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        margin-bottom: 18px;
+        display: none;
+        line-height: 1.4;
+    }
+
+    .alert-box.success {
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #34d399;
+    }
+
+    .alert-box.error {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #f87171;
+    }
+
+    .alert-box.info {
+        background: rgba(99, 102, 241, 0.12);
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        color: #818cf8;
     }
 
     .auth-footer {
         text-align: center;
         margin-top: 24px;
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         color: var(--text-muted);
     }
 
@@ -81,30 +166,228 @@
 
 <div class="auth-container">
     <div class="glass-card auth-card">
-        <h2 class="auth-title">Welcome Back</h2>
-        <p class="auth-subtitle">Sign in to your EventLens account</p>
+        <div class="auth-header">
+            <h2 class="auth-title">Welcome to EventLens</h2>
+            <p class="auth-subtitle">Access your AI wedding gallery</p>
+        </div>
 
-        <form method="POST">
-            {% csrf_token %}
-            {% if next %}
-            <input type="hidden" name="next" value="{{ next }}">
-            {% endif %}
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
+        <!-- Role Tab Switcher -->
+        <div class="tab-switcher">
+            <button class="tab-btn {% if active_tab == 'guest' %}active{% endif %}" onclick="switchTab('guest')">
+                ✨ Guest OTP Login
+            </button>
+            <button class="tab-btn {% if active_tab == 'photographer' %}active{% endif %}" onclick="switchTab('photographer')">
+                📷 Photographer Sign In
+            </button>
+        </div>
+
+        <!-- Notification Alert Box -->
+        <div id="statusAlert" class="alert-box"></div>
+
+        <!-- TAB 1: GUEST PHONE + OTP LOGIN -->
+        <div id="tabGuest" class="tab-content {% if active_tab == 'guest' %}active{% endif %}">
+            <form id="otpSendForm" onsubmit="handleSendOTP(event)">
+                {% csrf_token %}
+                <input type="hidden" id="guestNextUrl" value="{{ next }}">
+                
+                <div class="form-group">
+                    <label for="phoneNumber">Phone Number</label>
+                    <input type="tel" id="phoneNumber" placeholder="+1 234 567 8900" required autocomplete="tel">
+                    <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;">
+                        Enter your mobile phone number to receive a verification OTP code via SMS.
+                    </span>
+                </div>
+
+                <button type="submit" id="btnSendOTP" class="btn-primary" style="width: 100%; margin-top: 8px;">
+                    Send OTP Verification Code 📱
+                </button>
+            </form>
+
+            <!-- OTP Code Entry Step (Initially Hidden) -->
+            <form id="otpVerifyForm" onsubmit="handleVerifyOTP(event)" style="display: none; margin-top: 15px;">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="otpCode">6-Digit Verification Code</label>
+                    <input type="text" id="otpCode" class="otp-code-input" maxlength="6" placeholder="000000" required autocomplete="one-time-code">
+                </div>
+
+                <button type="submit" id="btnVerifyOTP" class="btn-primary" style="width: 100%; margin-top: 8px;">
+                    Verify & Access Gallery 🚀
+                </button>
+
+                <div style="text-align: center; margin-top: 14px;">
+                    <button type="button" onclick="resetOTPForm()" style="background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; text-decoration: underline;">
+                        Change Phone Number or Resend
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- TAB 2: PHOTOGRAPHER USERNAME/PASSWORD LOGIN -->
+        <div id="tabPhotographer" class="tab-content {% if active_tab == 'photographer' %}active{% endif %}">
+            <form method="POST">
+                {% csrf_token %}
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">
+                    Sign In as Photographer 📷
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Don't have a photographer account? <a href="{% url 'register' %}?role=photographer{% if next %}&next={{ next }}{% endif %}">Sign up here</a>
             </div>
-
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
-            </div>
-
-            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">Sign In</button>
-        </form>
-
-        <div class="auth-footer">
-            Don't have an account? <a href="{% url 'register' %}{% if next %}?next={{ next }}{% endif %}">Sign up here</a>
         </div>
     </div>
 </div>
+
+<script>
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    hideAlert();
+
+    if (tabName === 'guest') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tabGuest').classList.add('active');
+    } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tabPhotographer').classList.add('active');
+    }
+}
+
+function showAlert(message, type = 'info') {
+    const alertBox = document.getElementById('statusAlert');
+    alertBox.className = 'alert-box ' + type;
+    alertBox.innerHTML = message;
+    alertBox.style.display = 'block';
+}
+
+function hideAlert() {
+    const alertBox = document.getElementById('statusAlert');
+    alertBox.style.display = 'none';
+}
+
+function getCsrfToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+async function handleSendOTP(event) {
+    event.preventDefault();
+    hideAlert();
+
+    const phone = document.getElementById('phoneNumber').value.trim();
+    const btn = document.getElementById('btnSendOTP');
+
+    if (!phone) {
+        showAlert('Please enter your mobile phone number.', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Sending OTP... ⏳';
+
+    try {
+        const response = await fetch("{% url 'send_guest_otp' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ phone_number: phone })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && (data.status === 'success' || data.status === 'warning')) {
+            document.getElementById('otpSendForm').style.display = 'none';
+            document.getElementById('otpVerifyForm').style.display = 'block';
+            document.getElementById('otpCode').focus();
+
+            let msg = data.message || 'OTP verification code sent via SMS!';
+            if (data.dev_otp) {
+                msg += `<br><strong>[DEV CODE]:</strong> <span style="letter-spacing: 0.1em; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${data.dev_otp}</span>`;
+            }
+            showAlert(msg, 'success');
+        } else {
+            showAlert(data.message || 'Failed to send OTP. Please check the number and try again.', 'error');
+        }
+    } catch (err) {
+        showAlert('Network error sending OTP. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send OTP Verification Code 📱';
+    }
+}
+
+async function handleVerifyOTP(event) {
+    event.preventDefault();
+    hideAlert();
+
+    const phone = document.getElementById('phoneNumber').value.trim();
+    const otp = document.getElementById('otpCode').value.trim();
+    const nextUrl = document.getElementById('guestNextUrl').value;
+    const btn = document.getElementById('btnVerifyOTP');
+
+    if (!otp || otp.length < 4) {
+        showAlert('Please enter the verification code sent to your phone.', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Verifying Code... ⏳';
+
+    try {
+        const response = await fetch("{% url 'verify_guest_otp' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                phone_number: phone,
+                otp: otp,
+                next: nextUrl
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            showAlert('Verified successfully! Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = data.redirect_url || '/';
+            }, 600);
+        } else {
+            showAlert(data.message || 'Invalid verification code.', 'error');
+        }
+    } catch (err) {
+        showAlert('Network error verifying code. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Verify & Access Gallery 🚀';
+    }
+}
+
+function resetOTPForm() {
+    hideAlert();
+    document.getElementById('otpSendForm').style.display = 'block';
+    document.getElementById('otpVerifyForm').style.display = 'none';
+    document.getElementById('otpCode').value = '';
+    document.getElementById('phoneNumber').focus();
+}
+</script>
 {% endblock %}

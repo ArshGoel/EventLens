@@ -1,4 +1,6 @@
 import json
+import random
+import time
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
@@ -8,6 +10,7 @@ from django.contrib import messages
 from django.utils.text import slugify
 
 from Accounts.models import UserProfile
+from Accounts.twilio_utils import send_otp_sms
 from Events.models import Event
 from Photos.models import Photo
 from FaceEngine.models import GuestMatch
@@ -32,13 +35,115 @@ def home(request):
     return render(request, 'home.html')
 
 
+def send_guest_otp(request):
+    """
+    Generates a 6-digit OTP and sends via Twilio SMS to guest phone number.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            phone_number = data.get('phone_number', '').strip()
+        except Exception:
+            phone_number = request.POST.get('phone_number', '').strip()
+
+        if not phone_number or len(phone_number) < 7:
+            return JsonResponse({'status': 'error', 'message': 'Please enter a valid phone number.'}, status=400)
+
+        otp_code = str(random.randint(100000, 999999))
+        request.session['guest_otp'] = otp_code
+        request.session['guest_phone'] = phone_number
+        request.session['guest_otp_time'] = time.time()
+
+        success, msg = send_otp_sms(phone_number, otp_code)
+        return JsonResponse({
+            'status': 'success' if success else 'warning',
+            'message': msg,
+            'dev_otp': otp_code
+        })
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+
+def verify_guest_otp(request):
+    """
+    Verifies OTP entered by guest.
+    Logs in if account exists, or automatically creates account and logs in if new.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            phone_number = data.get('phone_number', '').strip()
+            otp_entered = data.get('otp', '').strip()
+            next_url = data.get('next', '').strip()
+        except Exception:
+            phone_number = request.POST.get('phone_number', '').strip()
+            otp_entered = request.POST.get('otp', '').strip()
+            next_url = request.POST.get('next', '').strip()
+
+        session_otp = request.session.get('guest_otp')
+        session_phone = request.session.get('guest_phone')
+        otp_time = request.session.get('guest_otp_time', 0)
+
+        if not session_otp or not session_phone:
+            return JsonResponse({'status': 'error', 'message': 'OTP session expired. Please request a new OTP.'}, status=400)
+
+        if time.time() - otp_time > 600:
+            return JsonResponse({'status': 'error', 'message': 'OTP has expired. Please request a new code.'}, status=400)
+
+        if otp_entered != session_otp:
+            return JsonResponse({'status': 'error', 'message': 'Invalid verification code. Please try again.'}, status=400)
+
+        # Clear OTP from session
+        request.session.pop('guest_otp', None)
+        request.session.pop('guest_phone', None)
+        request.session.pop('guest_otp_time', None)
+
+        clean_phone = session_phone.strip()
+
+        # Find existing guest user or create new one
+        profile = UserProfile.objects.filter(phone_number=clean_phone).first()
+        user = None
+        if profile:
+            user = profile.user
+        else:
+            user = User.objects.filter(username=clean_phone).first()
+
+        if not user:
+            user = User.objects.create_user(username=clean_phone)
+            user.set_unusable_password()
+            user.save()
+
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        if not profile.phone_number:
+            profile.phone_number = clean_phone
+        profile.is_guest = True
+        profile.save()
+
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        if not next_url or not next_url.startswith('/'):
+            next_url = '/'
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Successfully verified and logged in!',
+            'redirect_url': next_url
+        })
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+
 def register_view(request):
+    role = request.GET.get('role', 'guest')
     next_url = request.GET.get('next') or request.POST.get('next') or ''
+    if role == 'guest':
+        return redirect(f"/login/?role=guest&next={next_url}" if next_url else "/login/?role=guest")
+
     if request.method == 'POST':
         username = request.POST['username']
         email = request.POST['email']
         password = request.POST['password']
-        role = request.POST.get('role', 'guest') # 'photographer' or 'guest'
+        role = request.POST.get('role', 'photographer') # Default to photographer for register form
 
         if User.objects.filter(username=username).exists():
             messages.error(request, "Username already exists.")
@@ -47,7 +152,6 @@ def register_view(request):
         user = User.objects.create_user(username=username, email=email, password=password)
         is_photographer = (role == 'photographer')
         
-        # Create UserProfile
         UserProfile.objects.create(
             user=user,
             is_photographer=is_photographer,
@@ -66,28 +170,34 @@ def register_view(request):
 
 def login_view(request):
     next_url = request.GET.get('next') or request.POST.get('next') or ''
+    role = request.GET.get('role', '')
+
     if request.method == 'POST':
-        username = request.POST['username']
-        ctx_pass = request.POST['password']
-        user = authenticate(request, username=username, password=ctx_pass)
-        if user is not None:
-            login(request, user)
-            if next_url:
-                return redirect(next_url)
-            try:
-                if user.profile.is_photographer:
-                    return redirect('photographer_dashboard')
-            except UserProfile.DoesNotExist:
-                pass
-            return redirect('home')
-        else:
-            messages.error(request, "Invalid username or password.")
-    return render(request, 'login.html', {'next': next_url})
+        username = request.POST.get('username')
+        ctx_pass = request.POST.get('password')
+        if username and ctx_pass:
+            user = authenticate(request, username=username, password=ctx_pass)
+            if user is not None:
+                login(request, user)
+                if next_url:
+                    return redirect(next_url)
+                try:
+                    if user.profile.is_photographer:
+                        return redirect('photographer_dashboard')
+                except UserProfile.DoesNotExist:
+                    pass
+                return redirect('home')
+            else:
+                messages.error(request, "Invalid username or password.")
+
+    active_tab = 'guest' if (role == 'guest' or '/event/' in next_url or not role) else 'photographer'
+    return render(request, 'login.html', {'next': next_url, 'active_tab': active_tab})
 
 
 def logout_view(request):
     logout(request)
     return redirect('home')
+
 
 
 @login_required

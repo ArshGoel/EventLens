@@ -121,8 +121,7 @@
                 </div>
             {% else %}
                 <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                    <a href="{% url 'register' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Sign Up</a>
-                    {% comment %} <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); box-shadow: none;">📷 Scan QR Code</a> {% endcomment %}
+                    <a href="{% url 'login' %}?role=guest" class="btn-primary" style="width: 100%;">Guest Phone Login 📱</a>
                 </div>
             {% endif %}
         </div>
