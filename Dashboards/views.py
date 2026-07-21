@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.utils.text import slugify
 
 from Accounts.models import UserProfile
-from Accounts.twilio_utils import send_otp_sms
+from Accounts.email_utils import send_otp_email
 from Events.models import Event
 from Photos.models import Photo
 from FaceEngine.models import GuestMatch
@@ -37,24 +37,24 @@ def home(request):
 
 def send_guest_otp(request):
     """
-    Generates a 6-digit OTP and sends via Twilio SMS to guest phone number.
+    Generates a 6-digit OTP and sends via Email (Gmail SMTP) to guest email address.
     """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            phone_number = data.get('phone_number', '').strip()
+            email = data.get('email', '').strip().lower()
         except Exception:
-            phone_number = request.POST.get('phone_number', '').strip()
+            email = request.POST.get('email', '').strip().lower()
 
-        if not phone_number or len(phone_number) < 7:
-            return JsonResponse({'status': 'error', 'message': 'Please enter a valid phone number.'}, status=400)
+        if not email or '@' not in email or '.' not in email:
+            return JsonResponse({'status': 'error', 'message': 'Please enter a valid email address.'}, status=400)
 
         otp_code = str(random.randint(100000, 999999))
         request.session['guest_otp'] = otp_code
-        request.session['guest_phone'] = phone_number
+        request.session['guest_email'] = email
         request.session['guest_otp_time'] = time.time()
 
-        success, msg = send_otp_sms(phone_number, otp_code)
+        success, msg = send_otp_email(email, otp_code)
         return JsonResponse({
             'status': 'success' if success else 'warning',
             'message': msg,
@@ -66,56 +66,49 @@ def send_guest_otp(request):
 
 def verify_guest_otp(request):
     """
-    Verifies OTP entered by guest.
+    Verifies OTP code sent to guest email.
     Logs in if account exists, or automatically creates account and logs in if new.
     """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            phone_number = data.get('phone_number', '').strip()
+            email_entered = data.get('email', '').strip().lower()
             otp_entered = data.get('otp', '').strip()
             next_url = data.get('next', '').strip()
         except Exception:
-            phone_number = request.POST.get('phone_number', '').strip()
+            email_entered = request.POST.get('email', '').strip().lower()
             otp_entered = request.POST.get('otp', '').strip()
             next_url = request.POST.get('next', '').strip()
 
         session_otp = request.session.get('guest_otp')
-        session_phone = request.session.get('guest_phone')
+        session_email = request.session.get('guest_email')
         otp_time = request.session.get('guest_otp_time', 0)
 
-        if not session_otp or not session_phone:
-            return JsonResponse({'status': 'error', 'message': 'OTP session expired. Please request a new OTP.'}, status=400)
+        if not session_otp or not session_email:
+            return JsonResponse({'status': 'error', 'message': 'OTP session expired. Please request a new verification code.'}, status=400)
 
         if time.time() - otp_time > 600:
-            return JsonResponse({'status': 'error', 'message': 'OTP has expired. Please request a new code.'}, status=400)
+            return JsonResponse({'status': 'error', 'message': 'Verification code has expired. Please request a new code.'}, status=400)
 
         if otp_entered != session_otp:
             return JsonResponse({'status': 'error', 'message': 'Invalid verification code. Please try again.'}, status=400)
 
         # Clear OTP from session
         request.session.pop('guest_otp', None)
-        request.session.pop('guest_phone', None)
+        request.session.pop('guest_email', None)
         request.session.pop('guest_otp_time', None)
 
-        clean_phone = session_phone.strip()
+        clean_email = session_email.strip().lower()
 
-        # Find existing guest user or create new one
-        profile = UserProfile.objects.filter(phone_number=clean_phone).first()
-        user = None
-        if profile:
-            user = profile.user
-        else:
-            user = User.objects.filter(username=clean_phone).first()
+        # Find existing guest user by email or username
+        user = User.objects.filter(email=clean_email).first() or User.objects.filter(username=clean_email).first()
 
         if not user:
-            user = User.objects.create_user(username=clean_phone)
+            user = User.objects.create_user(username=clean_email, email=clean_email)
             user.set_unusable_password()
             user.save()
 
         profile, created = UserProfile.objects.get_or_create(user=user)
-        if not profile.phone_number:
-            profile.phone_number = clean_phone
         profile.is_guest = True
         profile.save()
 
@@ -131,6 +124,7 @@ def verify_guest_otp(request):
         })
 
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
 
 
 def register_view(request):

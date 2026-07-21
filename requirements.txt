@@ -16,5 +16,4 @@ google-auth-httplib2>=0.1.1
 whitenoise>=6.5.0
 dj-database-url>=2.1.0
 psycopg2-binary>=2.9.9
-twilio>=8.0.0
 python-dotenv>=1.0.0

@@ -192,10 +192,6 @@ FACE_DETECTION_SIZE = int(os.environ.get('FACE_DETECTION_SIZE', '480'))
 # Authentication Settings
 LOGIN_URL = 'login'
 
-# Twilio SMS Configuration
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 
 

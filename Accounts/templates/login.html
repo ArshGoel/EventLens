@@ -174,7 +174,7 @@
         <!-- Role Tab Switcher -->
         <div class="tab-switcher">
             <button class="tab-btn {% if active_tab == 'guest' %}active{% endif %}" onclick="switchTab('guest')">
-                ✨ Guest OTP Login
+                ✨ Guest Email OTP
             </button>
             <button class="tab-btn {% if active_tab == 'photographer' %}active{% endif %}" onclick="switchTab('photographer')">
                 📷 Photographer Sign In
@@ -184,22 +184,22 @@
         <!-- Notification Alert Box -->
         <div id="statusAlert" class="alert-box"></div>
 
-        <!-- TAB 1: GUEST PHONE + OTP LOGIN -->
+        <!-- TAB 1: GUEST EMAIL + OTP LOGIN -->
         <div id="tabGuest" class="tab-content {% if active_tab == 'guest' %}active{% endif %}">
             <form id="otpSendForm" onsubmit="handleSendOTP(event)">
                 {% csrf_token %}
                 <input type="hidden" id="guestNextUrl" value="{{ next }}">
                 
                 <div class="form-group">
-                    <label for="phoneNumber">Phone Number</label>
-                    <input type="tel" id="phoneNumber" placeholder="+1 234 567 8900" required autocomplete="tel">
+                    <label for="emailAddress">Email Address</label>
+                    <input type="email" id="emailAddress" placeholder="guest@example.com" required autocomplete="email">
                     <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;">
-                        Enter your mobile phone number to receive a verification OTP code via SMS.
+                        Enter your email address to receive a verification OTP code.
                     </span>
                 </div>
 
                 <button type="submit" id="btnSendOTP" class="btn-primary" style="width: 100%; margin-top: 8px;">
-                    Send OTP Verification Code 📱
+                    Send OTP Verification Code 📧
                 </button>
             </form>
 
@@ -217,7 +217,7 @@
 
                 <div style="text-align: center; margin-top: 14px;">
                     <button type="button" onclick="resetOTPForm()" style="background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; text-decoration: underline;">
-                        Change Phone Number or Resend
+                        Change Email Address or Resend
                     </button>
                 </div>
             </form>
@@ -289,11 +289,11 @@ async function handleSendOTP(event) {
     event.preventDefault();
     hideAlert();
 
-    const phone = document.getElementById('phoneNumber').value.trim();
+    const email = document.getElementById('emailAddress').value.trim();
     const btn = document.getElementById('btnSendOTP');
 
-    if (!phone) {
-        showAlert('Please enter your mobile phone number.', 'error');
+    if (!email) {
+        showAlert('Please enter your email address.', 'error');
         return;
     }
 
@@ -307,7 +307,7 @@ async function handleSendOTP(event) {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken()
             },
-            body: JSON.stringify({ phone_number: phone })
+            body: JSON.stringify({ email: email })
         });
 
         const data = await response.json();
@@ -317,19 +317,19 @@ async function handleSendOTP(event) {
             document.getElementById('otpVerifyForm').style.display = 'block';
             document.getElementById('otpCode').focus();
 
-            let msg = data.message || 'OTP verification code sent via SMS!';
-            if (data.dev_otp) {
+            let msg = data.message || 'OTP verification code sent to your email!';
+            if (data.dev_otp && data.status === 'warning') {
                 msg += `<br><strong>[DEV CODE]:</strong> <span style="letter-spacing: 0.1em; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${data.dev_otp}</span>`;
             }
             showAlert(msg, 'success');
         } else {
-            showAlert(data.message || 'Failed to send OTP. Please check the number and try again.', 'error');
+            showAlert(data.message || 'Failed to send OTP email. Please check your address and try again.', 'error');
         }
     } catch (err) {
         showAlert('Network error sending OTP. Please try again.', 'error');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = 'Send OTP Verification Code 📱';
+        btn.innerHTML = 'Send OTP Verification Code 📧';
     }
 }
 
@@ -337,13 +337,13 @@ async function handleVerifyOTP(event) {
     event.preventDefault();
     hideAlert();
 
-    const phone = document.getElementById('phoneNumber').value.trim();
+    const email = document.getElementById('emailAddress').value.trim();
     const otp = document.getElementById('otpCode').value.trim();
     const nextUrl = document.getElementById('guestNextUrl').value;
     const btn = document.getElementById('btnVerifyOTP');
 
     if (!otp || otp.length < 4) {
-        showAlert('Please enter the verification code sent to your phone.', 'error');
+        showAlert('Please enter the verification code sent to your email.', 'error');
         return;
     }
 
@@ -358,7 +358,7 @@ async function handleVerifyOTP(event) {
                 'X-CSRFToken': getCsrfToken()
             },
             body: JSON.stringify({
-                phone_number: phone,
+                email: email,
                 otp: otp,
                 next: nextUrl
             })
@@ -387,7 +387,7 @@ function resetOTPForm() {
     document.getElementById('otpSendForm').style.display = 'block';
     document.getElementById('otpVerifyForm').style.display = 'none';
     document.getElementById('otpCode').value = '';
-    document.getElementById('phoneNumber').focus();
+    document.getElementById('emailAddress').focus();
 }
 </script>
 {% endblock %}
