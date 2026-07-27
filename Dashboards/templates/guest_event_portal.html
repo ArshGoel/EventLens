@@ -420,7 +420,7 @@
     {% endwith %}
 
     <h1 class="event-title">{{ event.name }}</h1>
-    <p class="event-date">Wedding Date: {{ event.date }}</p>
+    <p class="event-date">Event Date: {{ event.date }}</p>
 </div>
 
 <div class="grid-portal">
@@ -494,7 +494,7 @@
         <div class="photo-grid" id="matched-gallery-grid">
             {% if not has_selfie %}
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; color: var(--text-muted);">
-                    <p style="font-size: 1.1rem; margin-bottom: 10px;">Please upload a selfie to find your wedding photos.</p>
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">Please upload a selfie to find your photos.</p>
                     <p style="font-size: 0.9rem;">Our face-recognition engine will filter the gallery for your pictures.</p>
                 </div>
             {% elif not matched_photos %}
@@ -817,7 +817,7 @@
             zip.generateAsync({ type: "blob" }).then(content => {
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(content);
-                link.download = `wedding_photos_${Date.now()}.zip`;
+                link.download = `event_photos_${Date.now()}.zip`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);

@@ -197,16 +197,16 @@
     <!-- Left Column: Create Event & Integrations -->
     <div style="display: flex; flex-direction: column; gap: 30px; height: fit-content;">
         <div class="glass-card">
-            <h2 class="form-title">Create Wedding Event</h2>
+            <h2 class="form-title">Create An Event</h2>
             <form method="POST">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="name">Wedding Name</label>
-                    <input type="text" id="name" name="name" placeholder="e.g. John & Jane Wedding" required>
+                    <label for="name">Event Name</label>
+                    <input type="text" id="name" name="name" placeholder="e.g. Annual Gala, Birthday Celebration, Tech Summit" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="date">Wedding Date</label>
+                    <label for="date">Event Date</label>
                     <input type="date" id="date" name="date" required>
                 </div>
 
@@ -217,12 +217,12 @@
 
                 <div class="form-group">
                     <label for="collections">Collections / Functions (Optional)</label>
-                    <input type="text" id="collections" name="collections" placeholder="e.g. Haldi, Mehendi, Sangeet, Wedding, Reception">
+                    <input type="text" id="collections" name="collections" placeholder="e.g. Haldi, Mehendi, Sangeet, Main Function, Reception">
                     <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
                         <span onclick="addPresetTag('Haldi')" class="badge-chip">+ Haldi</span>
                         <span onclick="addPresetTag('Mehendi')" class="badge-chip">+ Mehendi</span>
                         <span onclick="addPresetTag('Sangeet')" class="badge-chip">+ Sangeet</span>
-                        <span onclick="addPresetTag('Wedding')" class="badge-chip">+ Wedding</span>
+                        <span onclick="addPresetTag('Main Function')" class="badge-chip">+ Main Function</span>
                         <span onclick="addPresetTag('Reception')" class="badge-chip">+ Reception</span>
                     </div>
                 </div>
@@ -282,7 +282,7 @@
                 
                 <div class="form-group">
                     <label for="business_name">Studio / Business Name</label>
-                    <input type="text" id="business_name" name="business_name" value="{{ profile.business_name|default:'' }}" placeholder="e.g. Royal Wedding Captures">
+                    <input type="text" id="business_name" name="business_name" value="{{ profile.business_name|default:'' }}" placeholder="e.g. Apex Photography Studio">
                 </div>
 
                 <div class="form-group">
@@ -307,7 +307,7 @@
 
     <!-- Right Column: Events List & Upload Manager -->
     <div class="glass-card">
-        <h2 class="form-title" style="margin-bottom: 24px;">Your Wedding Galleries</h2>
+        <h2 class="form-title" style="margin-bottom: 24px;">Your Event Galleries</h2>
         
         {% if not events %}
             <div style="text-align: center; padding: 40px; color: var(--text-muted);">
@@ -382,7 +382,7 @@
                             <form action="{% url 'upload_photos' event.id %}" class="dropzone" id="my-dropzone-{{ event.id }}">
                                 {% csrf_token %}
                                 <div class="dz-message" data-dz-message>
-                                    <span>Drag & Drop Wedding Photos Here (JPG/PNG)</span>
+                                    <span>Drag & Drop Event Photos Here (JPG/PNG)</span>
                                 </div>
                             </form>
                         </div>
@@ -736,7 +736,7 @@
     }
 
     function promptAddCollection(eventId) {
-        const name = prompt("Enter collection name (e.g., Haldi, Mehendi, Sangeet, Wedding, Reception):");
+        const name = prompt("Enter collection name (e.g., Haldi, Mehendi, Sangeet, Main Function, Reception):");
         if (!name || !name.trim()) return;
 
         fetch(`/dashboard/event/${eventId}/collection/add/`, {
@@ -900,7 +900,7 @@
         const passcode = editPasscode.value;
 
         if (!name || !date) {
-            alert("Wedding Name and Date are required.");
+            alert("Event Name and Date are required.");
             return;
         }
 
@@ -936,7 +936,7 @@
 
     // 3. Delete Event Logic
     function deleteEvent(eventId, eventName) {
-        if (!confirm(`WARNING: Are you sure you want to delete the wedding event "${eventName}"? All photos will be deleted permanently!`)) {
+        if (!confirm(`WARNING: Are you sure you want to delete the event "${eventName}"? All photos will be deleted permanently!`)) {
             return;
         }
 
@@ -949,7 +949,7 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                showToast("Deleted", `Wedding event "${eventName}" deleted.`);
+                showToast("Deleted", `Event "${eventName}" deleted.`);
                 setTimeout(() => {
                     window.location.reload();
                 }, 1200);
@@ -1016,7 +1016,7 @@
         }
         
         if (dataUrl) {
-            const eventName = document.getElementById('qr-event-name').textContent || 'wedding';
+            const eventName = document.getElementById('qr-event-name').textContent || 'event';
             const cleanName = eventName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             const link = document.createElement('a');
             link.download = `qrcode-${cleanName}.jpg`;
@@ -1032,19 +1032,19 @@
 <div id="edit-event-modal" class="edit-modal" onclick="closeEditModal()">
     <div class="glass-card edit-modal-content" onclick="event.stopPropagation()">
         <h3 style="font-size: 1.4rem; margin-bottom: 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span>Edit Wedding Event</span>
+            <span>Edit Event</span>
             <button onclick="closeEditModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
         </h3>
         
         <input type="hidden" id="edit-event-id">
         
         <div class="form-group">
-            <label for="edit-name">Wedding Name</label>
+            <label for="edit-name">Event Name</label>
             <input type="text" id="edit-name" required>
         </div>
         
         <div class="form-group">
-            <label for="edit-date">Wedding Date</label>
+            <label for="edit-date">Event Date</label>
             <input type="date" id="edit-date" required>
         </div>
         

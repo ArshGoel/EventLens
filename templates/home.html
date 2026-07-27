@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}EventLens | AI Wedding Photo Delivery{% endblock %}
+{% block title %}EventLens | AI Event Photo Delivery{% endblock %}
 
 {% block content %}
 <style>
@@ -87,7 +87,7 @@
 </style>
 
 <div class="hero-section">
-    <h1 class="hero-title">Find Your Wedding Photos <span>Instantly</span></h1>
+    <h1 class="hero-title">Find Your Event Photos <span>Instantly</span></h1>
     <p class="hero-description">
         Photographers upload galleries. Guests upload a single selfie. Our AI matches face vectors to deliver your moments directly to you.
     </p>
@@ -98,7 +98,7 @@
             <div>
                 <div class="option-icon">📷</div>
                 <h2 class="option-title">For Photographers</h2>
-                <p class="option-desc">Create wedding events, lock galleries with passcodes, and upload bulk photos to let AI index them.</p>
+                <p class="option-desc">Create events & function collections, lock galleries with passcodes, and upload bulk photos to let AI index them.</p>
             </div>
             {% if user.is_authenticated and user.profile.is_photographer %}
                 <a href="{% url 'photographer_dashboard' %}" class="btn-primary" style="width: 100%;">Go to Dashboard</a>
@@ -114,12 +114,12 @@
             <div>
                 <div class="option-icon">✨</div>
                 <h2 class="option-title">For Guests</h2>
-                <p class="option-desc">Have you been invited to a wedding? Join, upload a selfie, and see all photos of you in real-time.</p>
+                <p class="option-desc">Have you been invited to an event? Join, upload a selfie, and see all photos of you in real-time.</p>
             </div>
             {% if user.is_authenticated %}
                 <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
                     <a href="{% url 'scan_qr' %}" class="btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">📷 Scan Event QR Code</a>
-                    <span class="text-muted" style="font-size: 0.82rem; margin-top: 5px;">Logged in as <strong>{{ user.username }}</strong>. Scan or open your wedding URL to find your photos!</span>
+                    <span class="text-muted" style="font-size: 0.82rem; margin-top: 5px;">Logged in as <strong>{{ user.username }}</strong>. Scan or open your event URL to find your photos!</span>
                 </div>
             {% else %}
                 <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">

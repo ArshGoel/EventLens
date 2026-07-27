@@ -96,7 +96,7 @@
 <div class="auth-container">
     <div class="glass-card auth-card">
         <h2 class="auth-title">Create Account</h2>
-        <p class="auth-subtitle">Join EventLens for instant wedding photo delivery</p>
+        <p class="auth-subtitle">Join EventLens for instant event photo delivery</p>
 
         <form method="POST">
             {% csrf_token %}
@@ -121,7 +121,7 @@
             <div class="form-group">
                 <label for="role">Register As</label>
                 <select id="role" name="role" required>
-                    <option value="guest" {% if request.GET.role == 'guest' %}selected{% endif %}>Wedding Guest</option>
+                    <option value="guest" {% if request.GET.role == 'guest' %}selected{% endif %}>Event Guest</option>
                     <option value="photographer" {% if request.GET.role == 'photographer' %}selected{% endif %}>Photographer</option>
                 </select>
             </div>

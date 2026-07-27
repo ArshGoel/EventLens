@@ -236,7 +236,7 @@ def match_guest_selfie_task(user_id, event_id):
 
     guest_embedding = np.array(profile.selfie_embedding)
 
-    send_socket_status("MATCHING", "Running AI Search", "Comparing your face with all photos in this wedding...")
+    send_socket_status("MATCHING", "Running AI Search", "Comparing your face with all photos in this event...")
 
     # Step 2: Compare against all photos inside the Event
     photos = Photo.objects.filter(event=event)
@@ -386,7 +386,7 @@ def send_hd_requests_email_task(user_id, event_id, base_url=None):
         if len(zip_data) < threshold:
             body = (
                 f"Hello {user.username},\n\n"
-                f"Attached is the high-resolution ZIP archive containing the {compiled_count} HD wedding photos "
+                f"Attached is the high-resolution ZIP archive containing the {compiled_count} HD event photos "
                 f"you requested from the event '{event.name}'.\n\n"
                 f"Enjoy your memories!\n\n"
                 f"Best regards,\n"
@@ -424,7 +424,7 @@ def send_hd_requests_email_task(user_id, event_id, base_url=None):
             
             body = (
                 f"Hello {user.username},\n\n"
-                f"The ZIP archive containing the {compiled_count} HD wedding photos you requested from the event '{event.name}' "
+                f"The ZIP archive containing the {compiled_count} HD event photos you requested from the event '{event.name}' "
                 f"exceeded email attachment size limits.\n\n"
                 f"You can download your high-resolution photos using the following secure link:\n"
                 f"{download_url}\n\n"
