@@ -133,6 +133,59 @@
         padding-bottom: 12px;
     }
 
+    /* Filter Pills & Gallery View Switcher */
+    .col-filter-btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .col-filter-btn:hover {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--text-main);
+    }
+    .col-filter-btn.active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .gallery-view-tab {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        font-weight: 700;
+        padding: 8px 14px;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .gallery-view-tab.active {
+        color: #818cf8;
+        border-bottom-color: #6366f1;
+    }
+    .photo-col-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #e2e8f0;
+        padding: 3px 9px;
+        border-radius: 12px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        z-index: 8;
+    }
+
     .photo-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -412,9 +465,33 @@
 
     <!-- Right Column: Photos Grid -->
     <div class="glass-card gallery-container">
-        <h2 class="gallery-title">Your Personal Gallery</h2>
-        
-        <div class="photo-grid" id="gallery-grid">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="view-tab-matched" class="gallery-view-tab active" onclick="switchGalleryTab('matched')">
+                    ✨ AI Matched Photos ({% if matched_photos %}{{ matched_photos|length }}{% else %}0{% endif %})
+                </button>
+                <button id="view-tab-all" class="gallery-view-tab" onclick="switchGalleryTab('all')">
+                    📁 Full Gallery ({{ all_photos|length }})
+                </button>
+            </div>
+        </div>
+
+        {% if collections %}
+        <!-- Collection Filter Tabs -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px;" id="collection-tabs">
+            <button type="button" class="col-filter-btn active" data-col="all" onclick="filterGalleryByCollection('all', this)">
+                All Functions
+            </button>
+            {% for col in collections %}
+            <button type="button" class="col-filter-btn" data-col="{{ col.id }}" onclick="filterGalleryByCollection('{{ col.id }}', this)">
+                📁 {{ col.name }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- AI Matched Photos Grid -->
+        <div class="photo-grid" id="matched-gallery-grid">
             {% if not has_selfie %}
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; color: var(--text-muted);">
                     <p style="font-size: 1.1rem; margin-bottom: 10px;">Please upload a selfie to find your wedding photos.</p>
@@ -427,11 +504,40 @@
                 </div>
             {% else %}
                 {% for photo in matched_photos %}
-                    <div class="photo-card" id="card-{{ photo.id }}" onclick="toggleSelectPhoto({{ photo.id }}, '{{ photo.preview_url }}', this)">
+                    <div class="photo-card" id="card-{{ photo.id }}" data-collection-id="{{ photo.collection_id|default:'' }}" onclick="toggleSelectPhoto({{ photo.id }}, '{{ photo.preview_url }}', this)">
                         <div class="select-indicator"></div>
+                        {% if photo.collection %}
+                            <span class="photo-col-badge">📁 {{ photo.collection.name }}</span>
+                        {% endif %}
                         <img src="{{ photo.preview_url }}" alt="Matched Photo">
                         <div class="photo-overlay">
                             <span style="font-size: 0.85rem; font-weight: 600;">EventLens AI Match</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-view-sm" onclick="event.stopPropagation(); openLightbox('{{ photo.preview_url }}', '{{ photo.download_url }}')">View</button>
+                                <a class="btn-view-sm" href="{{ photo.download_url }}" download onclick="event.stopPropagation();" target="_blank" style="text-decoration: none;">Download</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Full Gallery Grid -->
+        <div class="photo-grid" id="all-gallery-grid" style="display: none;">
+            {% if not all_photos %}
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; color: var(--text-muted);">
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">No photos uploaded to this event yet.</p>
+                </div>
+            {% else %}
+                {% for photo in all_photos %}
+                    <div class="photo-card" id="card-all-{{ photo.id }}" data-collection-id="{{ photo.collection_id|default:'' }}" onclick="toggleSelectPhoto({{ photo.id }}, '{{ photo.preview_url }}', this)">
+                        <div class="select-indicator"></div>
+                        {% if photo.collection %}
+                            <span class="photo-col-badge">📁 {{ photo.collection.name }}</span>
+                        {% endif %}
+                        <img src="{{ photo.preview_url }}" alt="Event Photo">
+                        <div class="photo-overlay">
+                            <span style="font-size: 0.85rem; font-weight: 600;">{% if photo.collection %}{{ photo.collection.name }}{% else %}General{% endif %}</span>
                             <div style="display: flex; gap: 8px;">
                                 <button class="btn-view-sm" onclick="event.stopPropagation(); openLightbox('{{ photo.preview_url }}', '{{ photo.download_url }}')">View</button>
                                 <a class="btn-view-sm" href="{{ photo.download_url }}" download onclick="event.stopPropagation();" target="_blank" style="text-decoration: none;">Download</a>
@@ -792,5 +898,54 @@
             closeOptionsModal();
         }
     });
+
+    // 8. Gallery View & Collection Filtering
+    let currentGalleryTab = 'matched';
+    let currentCollectionFilter = 'all';
+
+    function switchGalleryTab(tabName) {
+        currentGalleryTab = tabName;
+        const matchedGrid = document.getElementById('matched-gallery-grid');
+        const allGrid = document.getElementById('all-gallery-grid');
+        const tabMatched = document.getElementById('view-tab-matched');
+        const tabAll = document.getElementById('view-tab-all');
+
+        if (tabName === 'matched') {
+            if (matchedGrid) matchedGrid.style.display = 'grid';
+            if (allGrid) allGrid.style.display = 'none';
+            if (tabMatched) tabMatched.classList.add('active');
+            if (tabAll) tabAll.classList.remove('active');
+        } else {
+            if (matchedGrid) matchedGrid.style.display = 'none';
+            if (allGrid) allGrid.style.display = 'grid';
+            if (tabMatched) tabMatched.classList.remove('active');
+            if (tabAll) tabAll.classList.add('active');
+        }
+        applyCollectionFilter();
+    }
+
+    function filterGalleryByCollection(colId, btnElement) {
+        currentCollectionFilter = String(colId);
+        document.querySelectorAll('.col-filter-btn').forEach(b => b.classList.remove('active'));
+        if (btnElement) btnElement.classList.add('active');
+
+        applyCollectionFilter();
+    }
+
+    function applyCollectionFilter() {
+        const activeGridId = currentGalleryTab === 'matched' ? 'matched-gallery-grid' : 'all-gallery-grid';
+        const activeGrid = document.getElementById(activeGridId);
+        if (!activeGrid) return;
+
+        const cards = activeGrid.querySelectorAll('.photo-card');
+        cards.forEach(card => {
+            const cardCol = card.getAttribute('data-collection-id');
+            if (currentCollectionFilter === 'all' || cardCol === currentCollectionFilter) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
 </script>
 {% endblock %}

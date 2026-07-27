@@ -17,3 +17,18 @@ class Event(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Collection(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='collections')
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('event', 'name')
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.event.name} - {self.name}"
+
+

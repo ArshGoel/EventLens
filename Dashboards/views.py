@@ -11,7 +11,7 @@ from django.utils.text import slugify
 
 from Accounts.models import UserProfile
 from Accounts.email_utils import send_otp_email
-from Events.models import Event
+from Events.models import Event, Collection
 from Photos.models import Photo
 from FaceEngine.models import GuestMatch
 from FaceEngine.tasks import process_photo_faces_task, match_guest_selfie_task
@@ -244,20 +244,28 @@ def photographer_dashboard(request):
         name = request.POST['name']
         date = request.POST['date']
         passcode = request.POST.get('passcode', '')
+        collections_raw = request.POST.get('collections', '')
 
         # Create Event
-        Event.objects.create(
+        event = Event.objects.create(
             photographer=request.user,
             name=name,
             date=date,
             passcode=passcode
         )
+
+        # Parse & create collections if provided
+        if collections_raw:
+            col_names = [c.strip() for c in collections_raw.split(',') if c.strip()]
+            for c_name in col_names:
+                Collection.objects.get_or_create(event=event, name=c_name)
+
         messages.success(request, f"Event '{name}' created successfully!")
         return redirect('photographer_dashboard')
 
     from Accounts.models import GoogleDriveCredential
     google_drive_connected = GoogleDriveCredential.objects.filter(user=request.user).exists()
-    events = Event.objects.filter(photographer=request.user).order_by('-created_at')
+    events = Event.objects.filter(photographer=request.user).prefetch_related('collections', 'photos').order_by('-created_at')
     return render(request, 'photographer_dashboard.html', {
         'events': events,
         'google_drive_connected': google_drive_connected,
@@ -372,6 +380,11 @@ def upload_photos(request, event_id):
     """
     event = get_object_or_death(Event, id=event_id, photographer=request.user)
 
+    collection_obj = None
+    collection_id = request.POST.get('collection_id') or request.headers.get('X-Collection-ID')
+    if collection_id and str(collection_id).isdigit():
+        collection_obj = Collection.objects.filter(id=int(collection_id), event=event).first()
+
     files = []
     for key in request.FILES:
         files.extend(request.FILES.getlist(key))
@@ -432,7 +445,7 @@ def upload_photos(request, event_id):
                 except Exception as cloud_err:
                     pass
 
-            photo = Photo(event=event)
+            photo = Photo(event=event, collection=collection_obj)
 
             if cloudinary_url:
                 photo.image_url = cloudinary_url
@@ -475,8 +488,11 @@ def guest_portal(request, slug):
 
     profile = request.user.profile
     
+    collections = event.collections.all()
+    all_photos = Photo.objects.filter(event=event).select_related('collection').order_by('-uploaded_at')
+
     # Get matched photos
-    matches = GuestMatch.objects.filter(guest=request.user, photo__event=event).select_related('photo')
+    matches = GuestMatch.objects.filter(guest=request.user, photo__event=event).select_related('photo', 'photo__collection')
     matched_photos = [match.photo for match in matches]
 
     # Check if they have uploaded a selfie
@@ -488,6 +504,8 @@ def guest_portal(request, slug):
         'has_selfie': has_selfie,
         'selfie_url': selfie_url,
         'matched_photos': matched_photos,
+        'all_photos': all_photos,
+        'collections': collections,
     })
 
 
@@ -710,13 +728,15 @@ def list_event_photos(request, event_id):
     Lists all photos associated with an event.
     """
     event = get_object_or_death(Event, id=event_id, photographer=request.user)
-    photos = Photo.objects.filter(event=event).order_by('-uploaded_at')
+    photos = Photo.objects.filter(event=event).select_related('collection').order_by('-uploaded_at')
     
     photo_list = []
     for photo in photos:
         photo_list.append({
             'id': photo.id,
             'preview_url': photo.preview_url,
+            'collection_id': photo.collection_id,
+            'collection_name': photo.collection.name if photo.collection else 'General',
             'uploaded_at': photo.uploaded_at.strftime('%Y-%m-%d %H:%M')
         })
         
@@ -724,6 +744,77 @@ def list_event_photos(request, event_id):
         'status': 'success',
         'photos': photo_list
     })
+
+@login_required
+def add_collection(request, event_id):
+    """
+    Adds a new collection (e.g. Haldi, Mehendi, Sangeet) to an event.
+    """
+    event = get_object_or_death(Event, id=event_id, photographer=request.user)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name', '').strip()
+        except Exception:
+            name = request.POST.get('name', '').strip()
+
+        if not name:
+            return JsonResponse({'status': 'error', 'message': 'Collection name is required.'}, status=400)
+
+        collection, created = Collection.objects.get_or_create(event=event, name=name)
+        if not created:
+            return JsonResponse({'status': 'error', 'message': f"Collection '{name}' already exists."}, status=400)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f"Collection '{name}' added successfully!",
+            'collection': {
+                'id': collection.id,
+                'name': collection.name
+            }
+        })
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+@login_required
+def delete_collection(request, collection_id):
+    """
+    Deletes a collection from an event.
+    """
+    collection = get_object_or_death(Collection, id=collection_id, event__photographer=request.user)
+    if request.method == 'POST':
+        name = collection.name
+        collection.delete()
+        return JsonResponse({'status': 'success', 'message': f"Collection '{name}' deleted successfully."})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+@login_required
+def update_photo_collection(request, photo_id):
+    """
+    Updates the collection assigned to a photo.
+    """
+    photo = get_object_or_death(Photo, id=photo_id, event__photographer=request.user)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            collection_id = data.get('collection_id')
+        except Exception:
+            collection_id = request.POST.get('collection_id')
+
+        if collection_id is not None:
+            if str(collection_id).strip() in ['', 'null', '0', 'None']:
+                photo.collection = None
+            else:
+                col = get_object_or_death(Collection, id=int(collection_id), event=photo.event)
+                photo.collection = col
+            photo.save()
+            return JsonResponse({
+                'status': 'success', 
+                'message': 'Photo collection updated successfully.',
+                'collection_id': photo.collection_id,
+                'collection_name': photo.collection.name if photo.collection else 'General'
+            })
+        return JsonResponse({'status': 'error', 'message': 'collection_id parameter is required.'}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
 @login_required
 def delete_photo(request, photo_id):
@@ -765,4 +856,5 @@ def scan_qr_view(request):
     Renders the QR code scanner page for guests.
     """
     return render(request, 'scan_qr.html')
+
 

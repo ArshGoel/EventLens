@@ -3,7 +3,9 @@ from Events.models import Event
 
 class Photo(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='photos')
+    collection = models.ForeignKey('Events.Collection', on_delete=models.SET_NULL, null=True, blank=True, related_name='photos')
     image = models.ImageField(upload_to='photos/', blank=True, null=True)
+
     image_url = models.URLField(max_length=500, blank=True, null=True)
     google_drive_file_id = models.CharField(max_length=255, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
