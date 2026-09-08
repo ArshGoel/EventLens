@@ -121,21 +121,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Added Manually
 
-# Celery Configuration Options
-REDIS_URL = os.getenv(
-    "REDIS_URL",
-    "redis://127.0.0.1:6379/0"
-)
+# Celery & Redis Configuration Options
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("KV_URL") or "redis://127.0.0.1:6379/0"
 
-CELERY_BROKER_URL = os.getenv(
-    "CELERY_BROKER_URL",
-    REDIS_URL
-)
-
-CELERY_RESULT_BACKEND = os.getenv(
-    "CELERY_RESULT_BACKEND",
-    REDIS_URL
-)
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
@@ -155,7 +145,7 @@ CHANNEL_LAYERS = {
         'CONFIG': {
             "hosts": [{
                 "address": REDIS_URL,
-                "socket_timeout": None,
+                "socket_timeout": 5,
             }],
         },
     },
